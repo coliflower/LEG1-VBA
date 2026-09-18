@@ -2396,11 +2396,16 @@ Private Sub CarterBereichPruefen( _
 
     Dim cBereichStart As Long
     Dim cBereichEnde As Long
-    Dim cVorherigerMarker As Long
+
+    Dim zeileSchwelle2 As Long
 
     Dim i As Long
     Dim c As Long
-    Dim alleEins As Boolean
+
+    Dim schwelle As Double
+    Dim wert As Double
+    Dim anzahlUnterSchwelle As Long
+    Dim schwelleGueltig As Boolean
 
     If cBasisdaten <= 0 Then Exit Sub
     If cCarterNOK <= 0 Then Exit Sub
@@ -2418,45 +2423,17 @@ Private Sub CarterBereichPruefen( _
 
     End If
 
-    For i = zeileSpieler1 To letzteZeile
+    zeileSchwelle2 = _
+        DashboardZeileErmitteln( _
+            wsDash, _
+            NAME_DASHBOARD_SCHWELLE2)
 
-        alleEins = True
+    If zeileSchwelle2 <= 0 Then Exit Sub
 
-        If cBereichStart <= 0 Or _
-           cBereichStart > cBereichEnde Then
+    If cBereichStart <= 0 Or _
+       cBereichStart > cBereichEnde Then
 
-            alleEins = False
-
-        Else
-
-            For c = cBereichStart To cBereichEnde
-
-                If Not IstEins( _
-                        wsDash.Cells( _
-                            i, _
-                            c).Value) Then
-
-                    alleEins = False
-                    Exit For
-
-                End If
-
-            Next c
-
-        End If
-
-        If alleEins Then
-
-            wsDash.Cells( _
-                i, _
-                cCarterNOK).Value = 1
-
-            wsDash.Cells( _
-                i, _
-                cCarterNOK).Font.ColorIndex = _
-                xlAutomatic
-
-        Else
+        For i = zeileSpieler1 To letzteZeile
 
             wsDash.Cells( _
                 i, _
@@ -2464,8 +2441,112 @@ Private Sub CarterBereichPruefen( _
 
             wsDash.Cells( _
                 i, _
+                cCarterNOK).Font.ColorIndex = _
+                xlAutomatic
+
+        Next i
+
+        Exit Sub
+
+    End If
+
+    ' Zuerst alte rote Markierungen im Carter-Bereich entfernen.
+    ' Die tatsächliche Prüfung erfolgt anschließend gegen den
+    ' Schwellenwert in Dashboard_3_schwelle_2 derselben Spalte.
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cBereichStart), _
+        wsDash.Cells(letzteZeile, cBereichEnde)).Font.ColorIndex = _
+        xlAutomatic
+
+    ' Carter_NOK enthält pro Spieler die Anzahl der
+    ' Carter-Werte, die den jeweiligen Schwellenwert nicht erreichen.
+    For i = zeileSpieler1 To letzteZeile
+
+        anzahlUnterSchwelle = 0
+
+        For c = cBereichStart To cBereichEnde
+
+            schwelleGueltig = _
+                NumerischerWert( _
+                    wsDash.Cells( _
+                        zeileSchwelle2, _
+                        c).Value, _
+                    schwelle)
+
+            If schwelleGueltig Then
+
+                If NumerischerWert( _
+                        wsDash.Cells( _
+                            i, _
+                            c).Value, _
+                        wert) Then
+
+                    If wert < schwelle Then
+
+                        anzahlUnterSchwelle = _
+                            anzahlUnterSchwelle + 1
+
+                        wsDash.Cells( _
+                            i, _
+                            c).Font.Color = _
+                            RGB(255, 0, 0)
+
+                    Else
+
+                        wsDash.Cells( _
+                            i, _
+                            c).Font.ColorIndex = _
+                            xlAutomatic
+
+                    End If
+
+                Else
+
+                    ' Nicht numerische / leere Werte erreichen
+                    ' den Schwellenwert nicht und werden daher
+                    ' als NOK gezählt und rot markiert.
+                    anzahlUnterSchwelle = _
+                        anzahlUnterSchwelle + 1
+
+                    wsDash.Cells( _
+                        i, _
+                        c).Font.Color = _
+                        RGB(255, 0, 0)
+
+                End If
+
+            Else
+
+                ' Ohne gültigen Schwellenwert kann die Spalte
+                ' nicht geprüft werden. Bestehende Markierung
+                ' bleibt deshalb entfernt.
+                wsDash.Cells( _
+                    i, _
+                    c).Font.ColorIndex = _
+                    xlAutomatic
+
+            End If
+
+        Next c
+
+        wsDash.Cells( _
+            i, _
+            cCarterNOK).Value = _
+            anzahlUnterSchwelle
+
+        If anzahlUnterSchwelle > 0 Then
+
+            wsDash.Cells( _
+                i, _
                 cCarterNOK).Font.Color = _
                 RGB(255, 0, 0)
+
+        Else
+
+            wsDash.Cells( _
+                i, _
+                cCarterNOK).Font.ColorIndex = _
+                xlAutomatic
 
         End If
 
