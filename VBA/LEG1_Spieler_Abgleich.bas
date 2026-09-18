@@ -2893,7 +2893,7 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
 
     Dim spielerWerte As Collection
 
-    Dim anzahlUnterSchwelle As Long
+    Dim anzahlAktiveUnterSchwelle As Long
     Dim wertGefunden As Boolean
 
     sheetName = Format$( _
@@ -3006,7 +3006,9 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
             wertGefunden = _
                 CollectionKeyExistiert( _
                     spielerWerte, _
-                    key)            If wertGefunden Then
+                    key)
+
+            If wertGefunden Then
 
                 wert = CollectionWert( _
                     spielerWerte, _
@@ -3024,16 +3026,13 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
 
                     If zahl < schwelle Then
 
-                        anzahlUnterSchwelle = _
-                            anzahlUnterSchwelle + 1
-
                         If IstAktiv( _
                                 wsDash.Cells( _
                                     i, _
                                     DashboardSpalte(wsDash, LEG1_Basisdaten_Kopf)).Value) Then
 
-                            wsDash.Cells(1, cDash).Value = _
-                                CLng(wsDash.Cells(1, cDash).Value) + 1
+                            anzahlAktiveUnterSchwelle = _
+                                anzahlAktiveUnterSchwelle + 1
 
                         End If
 
@@ -3074,7 +3073,7 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
     Next i
 
     wsDash.Cells(1, cDash).Value = _
-        anzahlUnterSchwelle
+        anzahlAktiveUnterSchwelle
 
     ' Chests_NOK enthält die Anzahl der Chests-Spalten unterhalb
     ' des Schwellenwerts für diesen Spieler.
