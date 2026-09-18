@@ -81,8 +81,6 @@ Public Sub LEG1_Spieler_Abgleich()
     Dim cT9Seit As Long
 
     Dim cBasisdaten As Long
-    Dim cCarterNOK As Long
-    Dim cChestsNOK As Long
     Dim cLetzterNOK As Long
 
     Dim zeileSummen As Long
@@ -157,8 +155,6 @@ Public Sub LEG1_Spieler_Abgleich()
     cT9Seit = DashboardSpalte(wsDash, NAME_LEG1_T9_SEIT)
 
     cBasisdaten = DashboardSpalte(wsDash, LEG1_Basisdaten_Kopf)
-    cCarterNOK = DashboardSpalte(wsDash, CARTER_NOK_Kopf)
-    cChestsNOK = DashboardSpalte(wsDash, CHESTS_NOK_Kopf)
 
     cLetzterNOK = LetzterNOKMarker(wsDash)
 
@@ -183,8 +179,6 @@ Public Sub LEG1_Spieler_Abgleich()
     If cInternSortierung = 0 Then Err.Raise 1004, , "Der definierte Name '" & NAME_LEG1_INTERNSORTIERUNG & "' wurde nicht gefunden."
     If cT9Seit = 0 Then Err.Raise 1004, , "Der definierte Name '" & NAME_LEG1_T9_SEIT & "' wurde nicht gefunden."
     If cBasisdaten = 0 Then Err.Raise 1004, , "Der definierte Name '" & LEG1_Basisdaten_Kopf & "' wurde nicht gefunden."
-    If cCarterNOK = 0 Then Err.Raise 1004, , "Der definierte Name '" & CARTER_NOK_Kopf & "' wurde nicht gefunden."
-    If cChestsNOK = 0 Then Err.Raise 1004, , "Der definierte Name '" & CHESTS_NOK_Kopf & "' wurde nicht gefunden."
     If cLetzterNOK = 0 Then Err.Raise 1004, , "Es wurde kein gültiger _NOK-Endmarker gefunden."
     If zeileSummen = 0 Then Err.Raise 1004, , "Der definierte Name '" & NAME_DASHBOARD_SUMMEN & "' wurde nicht gefunden."
     If zeileSchwelle1 = 0 Then Err.Raise 1004, , "Der definierte Name '" & NAME_DASHBOARD_SCHWELLE1 & "' wurde nicht gefunden."
@@ -634,7 +628,6 @@ NaechsterUpdateSpielerNeu:
     CarterBereichPruefen _
         wsDash, _
         cBasisdaten, _
-        cCarterNOK, _
         zeileSpieler1, _
         letzteZeileDash
 
@@ -642,7 +635,6 @@ NaechsterUpdateSpielerNeu:
 
     ChestsSpaltenPruefen _
         wsDash, _
-        cChestsNOK, _
         cBasisdaten, _
         zeileSummen, _
         zeileSchwelle2, _
@@ -662,9 +654,7 @@ NaechsterUpdateSpielerNeu:
         wiederAktiveZeilen, _
         cSpieler, _
         cLetzterNOK, _
-        zeileSpieler1, _
-        cCarterNOK, _
-        cChestsNOK
+        zeileSpieler1
 
     wsDash.Columns(cInternNeu).Hidden = True
     wsDash.Columns(cInternSortierung).Hidden = True
@@ -2173,9 +2163,7 @@ Private Sub EndgueltigeSchriftfarbenSetzen( _
     ByVal wiederAktiveZeilen As Collection, _
     ByVal cSpieler As Long, _
     ByVal cLetzterNOK As Long, _
-    ByVal zeileSpieler1 As Long, _
-    ByVal cCarterNOK As Long, _
-    ByVal cChestsNOK As Long)
+    ByVal zeileSpieler1 As Long)
 
     Dim i As Long
     Dim cEnde As Long
@@ -2236,16 +2224,10 @@ Private Sub EndgueltigeSchriftfarbenSetzen( _
         letzteZeile, _
         neueZeilen
 
-    CarterNOKFarbenSetzen _
-        ws, _
-        cCarterNOK, _
-        zeileSpieler1, _
-        letzteZeile
-
-    ChestsNOKFarbenSetzen _
+    NOKFarbenSetzen _
         ws, _
         cBasisdaten, _
-        cChestsNOK, _
+        cLetzterNOK, _
         zeileSpieler1, _
         letzteZeile
 
@@ -2395,10 +2377,10 @@ End Sub
 Private Sub CarterBereichPruefen( _
     ByVal wsDash As Worksheet, _
     ByVal cBasisdaten As Long, _
-    ByVal cCarterNOK As Long, _
     ByVal zeileSpieler1 As Long, _
     ByVal letzteZeile As Long)
 
+    Dim cCarterNOK As Long
     Dim cBereichStart As Long
     Dim cBereichEnde As Long
 
@@ -2413,6 +2395,8 @@ Private Sub CarterBereichPruefen( _
     Dim schwelleGueltig As Boolean
 
     If cBasisdaten <= 0 Then Exit Sub
+
+    cCarterNOK = DashboardSpalte(wsDash, CARTER_NOK_Kopf)
     If cCarterNOK <= 0 Then Exit Sub
 
     If letzteZeile < zeileSpieler1 Then Exit Sub
@@ -2560,6 +2544,58 @@ Private Sub CarterBereichPruefen( _
 End Sub
 
 ' ============================================================
+' NOK-FARBEN GENERISCH SETZEN
+' ============================================================
+
+Private Sub NOKFarbenSetzen( _
+    ByVal ws As Worksheet, _
+    ByVal cBasisdaten As Long, _
+    ByVal cLetzterNOK As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal letzteZeile As Long)
+
+    Dim nokMarker As Collection
+    Dim cNOK As Variant
+    Dim i As Long
+    Dim wert As Double
+
+    If cBasisdaten <= 0 Then Exit Sub
+    If cLetzterNOK <= 0 Then Exit Sub
+    If letzteZeile < zeileSpieler1 Then Exit Sub
+
+    Set nokMarker = NOKMarkerSpaltenErmitteln(ws)
+
+    For Each cNOK In nokMarker
+
+        If CLng(cNOK) <= cLetzterNOK Then
+
+            For i = zeileSpieler1 To letzteZeile
+
+                If NumerischerWert( _
+                        ws.Cells(i, CLng(cNOK)).Value, _
+                        wert) Then
+
+                    If wert > 0 Then
+                        ws.Cells(i, CLng(cNOK)).Font.Color = RGB(255, 0, 0)
+                    Else
+                        ws.Cells(i, CLng(cNOK)).Font.ColorIndex = xlAutomatic
+                    End If
+
+                Else
+
+                    ws.Cells(i, CLng(cNOK)).Font.ColorIndex = xlAutomatic
+
+                End If
+
+            Next i
+
+        End If
+
+    Next cNOK
+
+End Sub
+
+' ============================================================
 ' CARTER_NOK FARBEN SETZEN
 ' ============================================================
 
@@ -2618,7 +2654,6 @@ End Sub
 
 Private Sub ChestsSpaltenPruefen( _
     ByVal wsDash As Worksheet, _
-    ByVal cChestsNOK As Long, _
     ByVal cBasisdaten As Long, _
     ByVal zeileSummen As Long, _
     ByVal zeileSchwelle2 As Long, _
@@ -2628,6 +2663,7 @@ Private Sub ChestsSpaltenPruefen( _
     ByVal letzteZeileDash As Long, _
     ByVal wsLog As Worksheet)
 
+    Dim cChestsNOK As Long
     Dim cBereichStart As Long
     Dim cBereichEnde As Long
     Dim cVorherigerMarker As Long
@@ -2641,8 +2677,10 @@ Private Sub ChestsSpaltenPruefen( _
     Dim wbChests As Workbook
     Dim wbWarBereitsOffen As Boolean
 
-    If cChestsNOK <= 0 Then Exit Sub
     If cBasisdaten <= 0 Then Exit Sub
+
+    cChestsNOK = DashboardSpalte(wsDash, CHESTS_NOK_Kopf)
+    If cChestsNOK <= 0 Then Exit Sub
 
     If zeileSummen <= 0 Then Exit Sub
     If zeileSchwelle2 <= 0 Then Exit Sub
