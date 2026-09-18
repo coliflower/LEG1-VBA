@@ -211,8 +211,6 @@ Public Sub LEG1_Spieler_Abgleich()
         cInternSortierung, _
         cT9Seit, _
         cBasisdaten, _
-        cCarterNOK, _
-        cChestsNOK, _
         cLetzterNOK, _
         zeileSummen, _
         zeileSchwelle1, _
@@ -1140,8 +1138,6 @@ Private Sub DashboardStrukturPruefen( _
     ByVal cInternSortierung As Long, _
     ByVal cT9Seit As Long, _
     ByVal cBasisdaten As Long, _
-    ByVal cCarterNOK As Long, _
-    ByVal cChestsNOK As Long, _
     ByVal cLetzterNOK As Long, _
     ByVal zeileSummen As Long, _
     ByVal zeileSchwelle1 As Long, _
@@ -1202,13 +1198,6 @@ Private Sub DashboardStrukturPruefen( _
 
     If cBasisdaten <= 0 Then _
         Err.Raise 1004, , "LEG1_basisdaten wurde nicht gefunden."
-
-    If cCarterNOK <= 0 Then _
-        Err.Raise 1004, , "Carter_NOK wurde nicht gefunden."
-
-    If cChestsNOK <= 0 Then _
-        Err.Raise 1004, , "Chests_NOK wurde nicht gefunden."
-
     If cLetzterNOK <= 0 Then _
         Err.Raise 1004, , _
         "Kein gültiger _NOK-Endmarker wurde gefunden."
@@ -1316,43 +1305,6 @@ Private Sub DashboardStrukturPruefen( _
         End If
 
     Next i
-
-    If Not IstErkannterNOKMarker( _
-            markerSpalten, _
-            markerAnzahl, _
-            cCarterNOK) Then
-
-        Err.Raise 1004, , _
-            "Carter_NOK ist kein gültiger _NOK-Marker der " & _
-            "erkannten Dashboard-Struktur."
-
-    End If
-
-    If Not IstErkannterNOKMarker( _
-            markerSpalten, _
-            markerAnzahl, _
-            cChestsNOK) Then
-
-        Err.Raise 1004, , _
-            "Chests_NOK ist kein gültiger _NOK-Marker der " & _
-            "erkannten Dashboard-Struktur."
-
-    End If
-
-    If cCarterNOK <= cBasisdaten Then
-
-        Err.Raise 1004, , _
-            "Carter_NOK muss rechts von LEG1_basisdaten liegen."
-
-    End If
-
-    If cChestsNOK <= cBasisdaten Then
-
-        Err.Raise 1004, , _
-            "Chests_NOK muss rechts von LEG1_basisdaten liegen."
-
-    End If
-
     If zeileSummen <= 0 Then _
         Err.Raise 1004, , _
         "Dashboard_1_summen wurde nicht gefunden."
@@ -1407,8 +1359,6 @@ Private Sub DashboardStrukturPruefen( _
         NAME_LEG1_INTERNSORTIERUNG, _
         NAME_LEG1_T9_SEIT, _
         LEG1_Basisdaten_Kopf, _
-        CARTER_NOK_Kopf, _
-        CHESTS_NOK_Kopf, _
         NAME_DASHBOARD_SUMMEN, _
         NAME_DASHBOARD_SCHWELLE1, _
         NAME_DASHBOARD_SCHWELLE2, _
@@ -1432,6 +1382,56 @@ Private Sub DashboardStrukturPruefen( _
     Next namePruefen
 
 End Sub
+
+' ============================================================
+' BEREICHSGRENZEN EINES _NOK-BEREICHS ERMITTELN
+' ============================================================
+
+Private Function BereichsGrenzenFuerNOKMarkerErmitteln( _
+    ByVal ws As Worksheet, _
+    ByVal cBasisdaten As Long, _
+    ByVal cNOKMarker As Long, _
+    ByRef cStart As Long, _
+    ByRef cEnde As Long) As Boolean
+
+    Dim markerSpalten() As Long
+    Dim markerAnzahl As Long
+    Dim cVorherigerMarker As Long
+
+    BereichsGrenzenFuerNOKMarkerErmitteln = False
+
+    cStart = 0
+    cEnde = -1
+
+    If cBasisdaten <= 0 Then Exit Function
+    If cNOKMarker <= cBasisdaten Then Exit Function
+
+    markerAnzahl = NOKMarkerSpaltenErmitteln( _
+        ws, _
+        markerSpalten)
+
+    If Not IstErkannterNOKMarker( _
+            markerSpalten, _
+            markerAnzahl, _
+            cNOKMarker) Then Exit Function
+
+    cVorherigerMarker = VorherigerNOKMarker( _
+        ws, _
+        cNOKMarker, _
+        cBasisdaten)
+
+    BereichsGrenzenErmitteln _
+        cVorherigerMarker, _
+        cNOKMarker, _
+        cStart, _
+        cEnde
+
+    If cStart <= 0 Then Exit Function
+    If cStart > cEnde Then Exit Function
+
+    BereichsGrenzenFuerNOKMarkerErmitteln = True
+
+End Function
 
 ' ============================================================
 ' BEREICHSGRENZEN ERMITTELN
@@ -2407,17 +2407,16 @@ Private Sub CarterBereichPruefen( _
 
     If letzteZeile < zeileSpieler1 Then Exit Sub
 
-    cVorherigerMarker = _
-        VorherigerNOKMarker( _
+    If Not BereichsGrenzenFuerNOKMarkerErmitteln( _
             wsDash, _
+            cBasisdaten, _
             cCarterNOK, _
-            cBasisdaten)
+            cBereichStart, _
+            cBereichEnde) Then
 
-    BereichsGrenzenErmitteln _
-        cVorherigerMarker, _
-        cCarterNOK, _
-        cBereichStart, _
-        cBereichEnde
+        Exit Sub
+
+    End If
 
     For i = zeileSpieler1 To letzteZeile
 
@@ -2550,17 +2549,16 @@ Private Sub ChestsSpaltenPruefen( _
     If zeileSchwelle2 <= 0 Then Exit Sub
     If zeileBezuege <= 0 Then Exit Sub
 
-    cVorherigerMarker = _
-        VorherigerNOKMarker( _
+    If Not BereichsGrenzenFuerNOKMarkerErmitteln( _
             wsDash, _
+            cBasisdaten, _
             cChestsNOK, _
-            cBasisdaten)
+            cBereichStart, _
+            cBereichEnde) Then
 
-    BereichsGrenzenErmitteln _
-        cVorherigerMarker, _
-        cChestsNOK, _
-        cBereichStart, _
-        cBereichEnde
+        Exit Sub
+
+    End If
 
     If cBereichStart <= 0 Then Exit Sub
 
@@ -3002,26 +3000,16 @@ Private Sub ChestsNOKFarbenSetzen( _
     Dim i As Long
     Dim cStart As Long
     Dim cEnde As Long
-    Dim cVorherigerMarker As Long
-
     If cChestsNOK <= 0 Then Exit Sub
     If cBasisdaten <= 0 Then Exit Sub
     If letzteZeile < zeileSpieler1 Then Exit Sub
 
-    cVorherigerMarker = _
-        VorherigerNOKMarker( _
+    If Not BereichsGrenzenFuerNOKMarkerErmitteln( _
             ws, _
+            cBasisdaten, _
             cChestsNOK, _
-            cBasisdaten)
-
-    BereichsGrenzenErmitteln _
-        cVorherigerMarker, _
-        cChestsNOK, _
-        cStart, _
-        cEnde
-
-    If cStart <= 0 Or _
-       cStart > cEnde Then
+            cStart, _
+            cEnde) Then
 
         For i = zeileSpieler1 To letzteZeile
 
