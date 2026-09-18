@@ -2377,6 +2377,7 @@ Private Sub CarterBereichPruefen( _
     Dim schwelle As Double
     Dim wert As Double
     Dim anzahlUnterSchwelle As Long
+    Dim anzahlUnterSchwelleSpalte As Long
     Dim schwelleGueltig As Boolean
 
     If cBasisdaten <= 0 Then Exit Sub
@@ -2432,8 +2433,20 @@ Private Sub CarterBereichPruefen( _
         wsDash.Cells(letzteZeile, cBereichEnde)).Font.ColorIndex = _
         xlAutomatic
 
+    ' Zeile 1 enthält je Carter-Spalte die Anzahl der Spieler,
+    ' die den jeweiligen Schwellenwert nicht erreichen.
+    wsDash.Range( _
+        wsDash.Cells(1, cBereichStart), _
+        wsDash.Cells(1, cBereichEnde)).ClearContents
+
     ' Carter_NOK enthält pro Spieler die Anzahl der
     ' Carter-Werte, die den jeweiligen Schwellenwert nicht erreichen.
+    For c = cBereichStart To cBereichEnde
+
+        anzahlUnterSchwelleSpalte = 0
+
+    Next c
+
     For i = zeileSpieler1 To letzteZeile
 
         anzahlUnterSchwelle = 0
@@ -2460,6 +2473,9 @@ Private Sub CarterBereichPruefen( _
                         anzahlUnterSchwelle = _
                             anzahlUnterSchwelle + 1
 
+                        anzahlUnterSchwelleSpalte = _
+                            anzahlUnterSchwelleSpalte + 1
+
                         wsDash.Cells( _
                             i, _
                             c).Font.Color = _
@@ -2482,6 +2498,9 @@ Private Sub CarterBereichPruefen( _
                     anzahlUnterSchwelle = _
                         anzahlUnterSchwelle + 1
 
+                    anzahlUnterSchwelleSpalte = _
+                        anzahlUnterSchwelleSpalte + 1
+
                     wsDash.Cells( _
                         i, _
                         c).Font.Color = _
@@ -2499,6 +2518,14 @@ Private Sub CarterBereichPruefen( _
                     c).Font.ColorIndex = _
                     xlAutomatic
 
+            End If
+
+        Next c
+
+        For c = cBereichStart To cBereichEnde
+
+            If anzahlUnterSchwelleSpalte > 0 Then
+                wsDash.Cells(1, c).Value = anzahlUnterSchwelleSpalte
             End If
 
         Next c
