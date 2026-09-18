@@ -2378,6 +2378,7 @@ Private Sub CarterBereichPruefen( _
     Dim wert As Double
     Dim anzahlUnterSchwelle As Long
     Dim schwelleGueltig As Boolean
+    Dim spielerAktiv As Boolean
 
     If cBasisdaten <= 0 Then Exit Sub
 
@@ -2441,6 +2442,8 @@ Private Sub CarterBereichPruefen( _
     For i = zeileSpieler1 To letzteZeile
 
         anzahlUnterSchwelle = 0
+        spielerAktiv = IstAktiv( _
+            wsDash.Cells(i, cBasisdaten).Value)
 
         For c = cBereichStart To cBereichEnde
 
@@ -2464,8 +2467,10 @@ Private Sub CarterBereichPruefen( _
                         anzahlUnterSchwelle = _
                             anzahlUnterSchwelle + 1
 
-                        wsDash.Cells(1, c).Value = _
-                            CLng(wsDash.Cells(1, c).Value) + 1
+                        If spielerAktiv Then
+                            wsDash.Cells(1, c).Value = _
+                                CLng(wsDash.Cells(1, c).Value) + 1
+                        End If
 
                         wsDash.Cells( _
                             i, _
@@ -2489,8 +2494,10 @@ Private Sub CarterBereichPruefen( _
                     anzahlUnterSchwelle = _
                         anzahlUnterSchwelle + 1
 
-                    wsDash.Cells(1, c).Value = _
-                        CLng(wsDash.Cells(1, c).Value) + 1
+                    If spielerAktiv Then
+                        wsDash.Cells(1, c).Value = _
+                            CLng(wsDash.Cells(1, c).Value) + 1
+                    End If
 
                     wsDash.Cells( _
                         i, _
