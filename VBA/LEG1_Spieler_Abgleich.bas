@@ -53,7 +53,7 @@ Private Const UPDATE_JOINED_SPALTE As Long = 12
 Private Const CHESTS_SPIELER_SPALTE As Long = 3
 Private Const CHESTS_WERT_SPALTE As Long = 5
 Private Const CHESTS_KOPFZEILE As Long = 3
-Private Const CHESTS_DATENSTART As Long = 4
+Private Const CHESTS_DATENSTART As Long = 3
 
 ' ============================================================
 ' HAUPTPROZEDUR
@@ -897,7 +897,6 @@ Private Function LetzterNOKMarker( _
     For Each nm In ThisWorkbook.Names
 
         nameText = nm.name
-
         If IstNOKMarkerName(nameText) Then
 
             Set rng = Nothing
@@ -1797,8 +1796,7 @@ Private Sub DatenUebernehmen( _
     ByVal cRang As Long, _
     ByVal cH As Long, _
     ByVal cMacht As Long, _
-    ByVal cG As Long, _
-    ByVal cM As Long, _
+    ByVal cG As Long, _    ByVal cM As Long, _
     ByVal cS As Long, _
     ByVal cE As Long, _
     ByVal cJoined As Long, _
@@ -2425,7 +2423,7 @@ Private Sub CarterBereichPruefen( _
 
     End If
 
-    ' Alte rote Markierungen und alte Zählungen in Zeile 1 entfernen.
+    ' Alte rote Markierungen, alte Zeile-1-Zählungen und alte Chests_NOK-Werte entfernen.
     wsDash.Range( _
         wsDash.Cells(zeileSpieler1, cBereichStart), _
         wsDash.Cells(letzteZeile, cBereichEnde)).Font.ColorIndex = _
@@ -2434,6 +2432,15 @@ Private Sub CarterBereichPruefen( _
     wsDash.Range( _
         wsDash.Cells(1, cBereichStart), _
         wsDash.Cells(1, cBereichEnde)).ClearContents
+
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cChestsNOK), _
+        wsDash.Cells(letzteZeile, cChestsNOK)).Value = 0
+
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cChestsNOK), _
+        wsDash.Cells(letzteZeile, cChestsNOK)).Font.ColorIndex = _
+        xlAutomatic
 
     ' Carter_NOK enthält pro Spieler die Anzahl der Carter-Werte,
     ' die den jeweiligen Schwellenwert nicht erreichen.
@@ -2697,8 +2704,7 @@ Private Sub ChestsSpaltenPruefen( _
     Next c
 
     Set wbChests = ChestsArbeitsmappeOeffnen( _
-        wsLog, _
-        wbWarBereitsOffen)
+        wsLog, _        wbWarBereitsOffen)
 
     If wbChests Is Nothing Then
 
@@ -2999,6 +3005,12 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
                     spielerWerte, _
                     key)
 
+                ' Den Quellenwert immer in die entsprechende
+                ' Dashboard-Zelle übernehmen.
+                wsDash.Cells( _
+                    i, _
+                    cDash).Value = wert
+
                 If NumerischerWert( _
                         wert, _
                         zahl) Then
@@ -3007,6 +3019,16 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
 
                         anzahlUnterSchwelle = _
                             anzahlUnterSchwelle + 1
+
+                        If IstAktiv( _
+                                wsDash.Cells( _
+                                    i, _
+                                    DashboardSpalte(wsDash, LEG1_Basisdaten_Kopf)).Value) Then
+
+                            wsDash.Cells(1, cDash).Value = _
+                                CLng(wsDash.Cells(1, cDash).Value) + 1
+
+                        End If
 
                         wsDash.Cells( _
                             i, _
@@ -3022,7 +3044,21 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
 
                     End If
 
+                Else
+
+                    wsDash.Cells( _
+                        i, _
+                        cDash).Font.ColorIndex = _
+                        xlAutomatic
+
                 End If
+
+            Else
+
+                ' Kein Quellwert: keine Wertübernahme und kein NOK.
+                wsDash.Cells( _
+                    i, _
+                    cDash).ClearContents
 
             End If
 
@@ -3032,6 +3068,35 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
 
     wsDash.Cells(1, cDash).Value = _
         anzahlUnterSchwelle
+
+    ' Chests_NOK enthält die Anzahl der Chests-Spalten unterhalb
+    ' des Schwellenwerts für diesen Spieler.
+    For i = zeileSpieler1 To letzteZeileDash
+
+        spieler = SichererText( _
+            wsDash.Cells(i, cSpieler).Value)
+
+        If Len(spieler) > 0 Then
+
+            key = SpielerKey(spieler)
+
+            If CollectionKeyExistiert(spielerWerte, key) Then
+
+                wert = CollectionWert(spielerWerte, key)
+
+                If NumerischerWert(wert, zahl) Then
+
+                    If zahl < schwelle Then
+                        wsDash.Cells(i, cDash).Font.Color = RGB(255, 0, 0)
+                    End If
+
+                End If
+
+            End If
+
+        End If
+
+    Next i
 
 End Sub
 
