@@ -2570,28 +2570,41 @@ Private Sub CarterNOKFarbenSetzen( _
     ByVal letzteZeile As Long)
 
     Dim i As Long
+    Dim wert As Double
 
     If cCarterNOK <= 0 Then Exit Sub
     If letzteZeile < zeileSpieler1 Then Exit Sub
 
     For i = zeileSpieler1 To letzteZeile
 
-        If IstEins( _
+        If NumerischerWert( _
                 ws.Cells( _
                     i, _
-                    cCarterNOK).Value) Then
+                    cCarterNOK).Value, _
+                wert) Then
 
-            ws.Cells( _
-                i, _
-                cCarterNOK).Font.ColorIndex = _
-                xlAutomatic
+            If wert > 0 Then
+
+                ws.Cells( _
+                    i, _
+                    cCarterNOK).Font.Color = _
+                    RGB(255, 0, 0)
+
+            Else
+
+                ws.Cells( _
+                    i, _
+                    cCarterNOK).Font.ColorIndex = _
+                    xlAutomatic
+
+            End If
 
         Else
 
             ws.Cells( _
                 i, _
-                cCarterNOK).Font.Color = _
-                RGB(255, 0, 0)
+                cCarterNOK).Font.ColorIndex = _
+                xlAutomatic
 
         End If
 
