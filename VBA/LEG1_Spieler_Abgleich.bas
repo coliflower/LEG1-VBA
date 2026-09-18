@@ -2603,7 +2603,6 @@ Private Sub ChestsSpaltenPruefen( _
     Dim cChestsNOK As Long
     Dim cBereichStart As Long
     Dim cBereichEnde As Long
-    Dim cVorherigerMarker As Long
     Dim c As Long
 
     Dim kopf As String
@@ -3057,91 +3056,6 @@ Private Sub ChestsNOKAlleSpielerZuruecksetzen( _
         wsDash.Cells(zeileSpieler1, cChestsNOK), _
         wsDash.Cells(letzteZeileDash, cChestsNOK)).Font.ColorIndex = _
         xlAutomatic
-
-End Sub
-
-' ============================================================
-' CHESTS_NOK PRO SPIELER NEU BERECHNEN
-' ============================================================
-
-Private Sub ChestsNOKProSpielerNeu( _
-    ByVal wsDash As Worksheet, _
-    ByVal cStart As Long, _
-    ByVal cEnde As Long, _
-    ByVal cChestsNOK As Long, _
-    ByVal zeileSpieler1 As Long, _
-    ByVal letzteZeile As Long)
-
-    Dim zeileSchwelle2 As Long
-    Dim c As Long
-    Dim i As Long
-
-    Dim anzahl As Long
-    Dim schwelle As Double
-    Dim wert As Double
-
-    Dim wertVariant As Variant
-
-    zeileSchwelle2 = _
-        DashboardZeileErmitteln( _
-            wsDash, _
-            NAME_DASHBOARD_SCHWELLE2)
-
-    If zeileSchwelle2 <= 0 Then Exit Sub
-
-    For i = zeileSpieler1 To letzteZeile
-
-        anzahl = 0
-
-        For c = cStart To cEnde
-
-            If NumerischerWert( _
-                    wsDash.Cells( _
-                        zeileSchwelle2, _
-                        c).Value, _
-                    schwelle) Then
-
-                wertVariant = _
-                    wsDash.Cells( _
-                        i, _
-                        c).Value
-
-                If NumerischerWert( _
-                        wertVariant, _
-                        wert) Then
-
-                    If wert < schwelle Then
-                        anzahl = anzahl + 1
-                    End If
-
-                End If
-
-            End If
-
-        Next c
-
-        wsDash.Cells( _
-            i, _
-            cChestsNOK).Value = _
-            anzahl
-
-        If anzahl > 0 Then
-
-            wsDash.Cells( _
-                i, _
-                cChestsNOK).Font.Color = _
-                RGB(255, 0, 0)
-
-        Else
-
-            wsDash.Cells( _
-                i, _
-                cChestsNOK).Font.ColorIndex = _
-                xlAutomatic
-
-        End If
-
-    Next i
 
 End Sub
 
