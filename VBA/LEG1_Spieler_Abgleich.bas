@@ -2189,7 +2189,7 @@ Private Sub EndgueltigeSchriftfarbenSetzen( _
                 ws, _
                 i, _
                 cSpieler, _
-                cEnde
+                cLetzterNOK
 
         End If
 
