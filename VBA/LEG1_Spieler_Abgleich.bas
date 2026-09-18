@@ -2554,36 +2554,44 @@ Private Sub NOKFarbenSetzen( _
     ByVal zeileSpieler1 As Long, _
     ByVal letzteZeile As Long)
 
-    Dim nokMarker As Collection
-    Dim cNOK As Variant
+    Dim markerSpalten() As Long
+    Dim markerAnzahl As Long
     Dim i As Long
+    Dim j As Long
     Dim wert As Double
+    Dim cNOK As Long
 
     If cBasisdaten <= 0 Then Exit Sub
     If cLetzterNOK <= 0 Then Exit Sub
     If letzteZeile < zeileSpieler1 Then Exit Sub
 
-    Set nokMarker = NOKMarkerSpaltenErmitteln(ws)
+    markerAnzahl = NOKMarkerSpaltenErmitteln( _
+        ws, _
+        markerSpalten)
 
-    For Each cNOK In nokMarker
+    If markerAnzahl <= 0 Then Exit Sub
 
-        If CLng(cNOK) <= cLetzterNOK Then
+    For j = 1 To markerAnzahl
+
+        cNOK = markerSpalten(j)
+
+        If cNOK <= cLetzterNOK Then
 
             For i = zeileSpieler1 To letzteZeile
 
                 If NumerischerWert( _
-                        ws.Cells(i, CLng(cNOK)).Value, _
+                        ws.Cells(i, cNOK).Value, _
                         wert) Then
 
                     If wert > 0 Then
-                        ws.Cells(i, CLng(cNOK)).Font.Color = RGB(255, 0, 0)
+                        ws.Cells(i, cNOK).Font.Color = RGB(255, 0, 0)
                     Else
-                        ws.Cells(i, CLng(cNOK)).Font.ColorIndex = xlAutomatic
+                        ws.Cells(i, cNOK).Font.ColorIndex = xlAutomatic
                     End If
 
                 Else
 
-                    ws.Cells(i, CLng(cNOK)).Font.ColorIndex = xlAutomatic
+                    ws.Cells(i, cNOK).Font.ColorIndex = xlAutomatic
 
                 End If
 
@@ -2591,7 +2599,7 @@ Private Sub NOKFarbenSetzen( _
 
         End If
 
-    Next cNOK
+    Next j
 
 End Sub
 
