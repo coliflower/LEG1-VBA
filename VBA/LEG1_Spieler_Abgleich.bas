@@ -8,6 +8,7 @@ Private Const DashboardBlattName As String = "dashboard"
 Private Const UpdateBlattName As String = "update"
 
 Private Const CHESTS_DATEI As String = "TB__Chests.xlsx"
+Private Const VAULTS_DATEI As String = "TB__Vaults.xlsx"
 
 ' ------------------------------------------------------------
 ' Dashboard - definierte Namen / Name Manager
@@ -631,6 +632,23 @@ NaechsterUpdateSpielerNeu:
         zeileSpieler1, _
         letzteZeileDash, _
         wsLog
+
+    schritt = "Vaults-Bereich erkennen und prüfen"
+
+    VaultsBereichPruefen _
+        wsDash, _
+        cBasisdaten, _
+        zeileSummen, _
+        zeileSchwelle1, _
+        zeileSchwelle2, _
+        zeileBezuege, _
+        cSpieler, _
+        cT9, _
+        zeileSpieler1, _
+        letzteZeileDash, _
+        wsLog
+
+    cLetzterNOK = LetzterNOKMarker(wsDash)
 
     schritt = "Endgültige Schriftfarben setzen"
 
@@ -3321,6 +3339,396 @@ End Sub
 ' ============================================================
 ' DASHBOARD SORTIEREN
 ' ============================================================
+
+
+' ============================================================
+' VAULTS-BEREICH ERKENNEN UND PRÜFEN
+' ============================================================
+
+Private Sub VaultsBereichPruefen( _
+    ByVal wsDash As Worksheet, _
+    ByVal cBasisdaten As Long, _
+    ByVal zeileSummen As Long, _
+    ByVal zeileSchwelle1 As Long, _
+    ByVal zeileSchwelle2 As Long, _
+    ByVal zeileBezuege As Long, _
+    ByVal cSpieler As Long, _
+    ByVal cT9 As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal letzteZeileDash As Long, _
+    ByVal wsLog As Worksheet)
+
+    Dim wbVaults As Workbook
+    Dim wsQuelle As Worksheet
+    Dim cNOK As Long
+    Dim cStart As Long
+    Dim c As Long
+    Dim i As Long
+    Dim blattIndex As Long
+    Dim anzahlBlaetter As Long
+    Dim blattName As String
+    Dim nameText As String
+    Dim schwelle1 As Double
+    Dim schwelle2 As Double
+    Dim hatSchwelle1 As Boolean
+    Dim hatSchwelle2 As Boolean
+    Dim wert As Variant
+    Dim zahl As Double
+    Dim spieler As String
+    Dim key As String
+    Dim letzteZeileQuelle As Long
+    Dim spielerWerte As Collection
+    Dim anzahlAktiveUnterSchwelle As Long
+    Dim schwelleVerwenden As Double
+    Dim pruefen As Boolean
+    Dim wertGefunden As Boolean
+    Dim warBereitsOffen As Boolean
+    Dim letzterNOKVorher As Long
+
+    If Len(ThisWorkbook.Path) = 0 Then Exit Sub
+
+    If Dir(ThisWorkbook.Path & Application.PathSeparator & VAULTS_DATEI) = "" Then Exit Sub
+
+    On Error Resume Next
+    Set wbVaults = Workbooks(VAULTS_DATEI)
+    On Error GoTo 0
+
+    If wbVaults Is Nothing Then
+
+        On Error GoTo OeffnenFehler
+
+        Set wbVaults = Workbooks.Open( _
+            FileName:=ThisWorkbook.Path & Application.PathSeparator & VAULTS_DATEI, _
+            UpdateLinks:=0, _
+            ReadOnly:=True)
+
+        On Error GoTo 0
+
+    Else
+
+        warBereitsOffen = True
+
+    End If
+
+    If wbVaults Is Nothing Then Exit Sub
+
+    On Error Resume Next
+    cNOK = DashboardSpalte(wsDash, "Vaults_NOK")
+    On Error GoTo 0
+
+    anzahlBlaetter = wbVaults.Worksheets.Count
+
+    If anzahlBlaetter = 0 Then GoTo Aufraeumen
+
+    If cNOK = 0 Then
+
+        letzterNOKVorher = LetzterNOKMarker(wsDash)
+
+        If letzterNOKVorher <= 0 Then GoTo Aufraeumen
+
+        cStart = letzterNOKVorher + 1
+        cNOK = cStart + anzahlBlaetter
+
+        wsDash.Columns(cStart).Resize( _
+            ColumnSize:=anzahlBlaetter + 1).Insert _
+                Shift:=xlToRight
+
+        ThisWorkbook.Names.Add _
+            name:="Vaults_NOK", _
+            RefersTo:="=" & wsDash.Cells(zeileBezuege, cNOK).Address( _
+                RowAbsolute:=True, _
+                ColumnAbsolute:=True, _
+                ReferenceStyle:=xlA1, _
+                External:=True)
+
+    Else
+
+        ' Der erste Test geht davon aus, dass Vaults_NOK der letzte
+        ' Bereichsmarker ist. Der Bereich beginnt direkt danach,
+        ' bzw. die vorhandenen Vaults-Spalten liegen unmittelbar davor.
+        cStart = cNOK - anzahlBlaetter
+
+        If cStart <= 0 Then GoTo Aufraeumen
+
+    End If
+
+    If cStart <= 0 Or cNOK <= cStart Then GoTo Aufraeumen
+
+    ' Alte Vaults_NOK-Zählungen zurücksetzen.
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cNOK), _
+        wsDash.Cells(letzteZeileDash, cNOK)).Value = 0
+
+    For blattIndex = 1 To anzahlBlaetter
+
+        Set wsQuelle = wbVaults.Worksheets(blattIndex)
+
+        c = cStart + blattIndex - 1
+        blattName = SichererText(wsQuelle.Name)
+
+        wsDash.Cells(1, c).Value = 0
+        wsDash.Cells(zeileSchwelle1, c).ClearContents
+        wsDash.Cells(zeileSchwelle2, c).ClearContents
+        wsDash.Cells(zeileBezuege, c).Value = blattName
+
+        hatSchwelle1 = NumerischerWert( _
+            wsQuelle.Cells(1, 4).Value, _
+            schwelle1)
+
+        hatSchwelle2 = NumerischerWert( _
+            wsQuelle.Cells(1, 5).Value, _
+            schwelle2)
+
+        If hatSchwelle1 Then _
+            wsDash.Cells(zeileSchwelle1, c).Value = schwelle1
+
+        If hatSchwelle2 Then _
+            wsDash.Cells(zeileSchwelle2, c).Value = schwelle2
+
+        nameText = "Vaults_" & blattName
+
+        VaultsNameSicherstellen _
+            wsDash, _
+            c, _
+            zeileSummen, _
+            nameText
+
+        Set spielerWerte = New Collection
+
+        letzteZeileQuelle = wsQuelle.Cells( _
+            wsQuelle.Rows.Count, _
+            3).End(xlUp).Row
+
+        If letzteZeileQuelle >= 3 Then
+
+            For i = 3 To letzteZeileQuelle
+
+                spieler = SichererText( _
+                    wsQuelle.Cells(i, 3).Value)
+
+                If Len(spieler) > 0 Then
+
+                    key = SpielerKey(spieler)
+
+                    If CollectionKeyExistiert( _
+                            spielerWerte, _
+                            key) Then
+
+                        LogEintrag _
+                            wsLog, _
+                            "DUPLIKAT VAULTS", _
+                            spieler, _
+                            "Spieler kommt mehrfach im Quellblatt '" & _
+                            blattName & _
+                            "' vor. Der erste Wert wird verwendet."
+
+                    Else
+
+                        spielerWerte.Add _
+                            wsQuelle.Cells(i, 5).Value, _
+                            key
+
+                    End If
+
+                End If
+
+            Next i
+
+        End If
+
+        anzahlAktiveUnterSchwelle = 0
+
+        For i = zeileSpieler1 To letzteZeileDash
+
+            spieler = SichererText( _
+                wsDash.Cells(i, cSpieler).Value)
+
+            If Len(spieler) > 0 Then
+
+                key = SpielerKey(spieler)
+
+                wertGefunden = CollectionKeyExistiert( _
+                    spielerWerte, _
+                    key)
+
+                If wertGefunden Then
+
+                    wert = CollectionWert( _
+                        spielerWerte, _
+                        key)
+
+                    wsDash.Cells(i, c).Value = wert
+
+                    pruefen = False
+
+                    If hatSchwelle1 And hatSchwelle2 Then
+
+                        If IstEins( _
+                                wsDash.Cells(i, cT9).Value) Then
+
+                            schwelleVerwenden = schwelle1
+
+                        Else
+
+                            schwelleVerwenden = schwelle2
+
+                        End If
+
+                        pruefen = True
+
+                    ElseIf (Not hatSchwelle1) And hatSchwelle2 Then
+
+                        schwelleVerwenden = schwelle2
+                        pruefen = True
+
+                    ElseIf hatSchwelle1 And (Not hatSchwelle2) Then
+
+                        If IstEins( _
+                                wsDash.Cells(i, cT9).Value) Then
+
+                            schwelleVerwenden = schwelle1
+                            pruefen = True
+
+                        End If
+
+                    End If
+
+                    If pruefen And NumerischerWert( _
+                            wert, _
+                            zahl) Then
+
+                        If zahl < schwelleVerwenden Then
+
+                            If IstAktiv( _
+                                    wsDash.Cells( _
+                                        i, _
+                                        cBasisdaten).Value) Then
+
+                                anzahlAktiveUnterSchwelle = _
+                                    anzahlAktiveUnterSchwelle + 1
+
+                            End If
+
+                            wsDash.Cells(i, c).Font.Color = _
+                                RGB(255, 0, 0)
+
+                            wsDash.Cells(i, cNOK).Value = _
+                                CLng(Val(wsDash.Cells(i, cNOK).Value)) + 1
+
+                        Else
+
+                            wsDash.Cells(i, c).Font.ColorIndex = _
+                                xlAutomatic
+
+                        End If
+
+                    Else
+
+                        wsDash.Cells(i, c).Font.ColorIndex = _
+                            xlAutomatic
+
+                    End If
+
+                Else
+
+                    wsDash.Cells(i, c).ClearContents
+
+                    wsDash.Cells(i, c).Font.ColorIndex = _
+                        xlAutomatic
+
+                End If
+
+            End If
+
+        Next i
+
+        wsDash.Cells(1, c).Value = _
+            anzahlAktiveUnterSchwelle
+
+    Next blattIndex
+
+Aufraeumen:
+
+    If Not wbVaults Is Nothing Then
+
+        If Not warBereitsOffen Then
+
+            On Error Resume Next
+
+            wbVaults.Close SaveChanges:=False
+
+            On Error GoTo 0
+
+        End If
+
+    End If
+
+    Exit Sub
+
+OeffnenFehler:
+
+    LogEintrag _
+        wsLog, _
+        "VAULTS WARNUNG", _
+        "", _
+        "Die Datei '" & _
+        VAULTS_DATEI & _
+        "' konnte nicht geöffnet werden. Fehler " & _
+        CStr(Err.Number) & _
+        ": " & _
+        Err.Description
+
+    Resume Aufraeumen
+
+End Sub
+
+' ============================================================
+' VAULTS NAME SICHERSTELLEN
+' ============================================================
+
+Private Sub VaultsNameSicherstellen( _
+    ByVal wsDash As Worksheet, _
+    ByVal c As Long, _
+    ByVal zeileSummen As Long, _
+    ByVal nameText As String)
+
+    Dim nm As name
+    Dim rngZiel As Range
+    Dim zielBezug As String
+
+    Set rngZiel = wsDash.Cells(zeileSummen, c)
+
+    zielBezug = "=" & _
+        rngZiel.Address( _
+            RowAbsolute:=True, _
+            ColumnAbsolute:=True, _
+            ReferenceStyle:=xlA1, _
+            External:=True)
+
+    Set nm = Nothing
+
+    On Error Resume Next
+
+    Set nm = ThisWorkbook.Names(nameText)
+
+    If nm Is Nothing Then _
+        Set nm = wsDash.Names(nameText)
+
+    On Error GoTo 0
+
+    If nm Is Nothing Then
+
+        ThisWorkbook.Names.Add _
+            name:=nameText, _
+            RefersTo:=zielBezug
+
+    Else
+
+        nm.RefersTo = zielBezug
+
+    End If
+
+End Sub
 
 Private Sub DashboardSortieren( _
     ByVal ws As Worksheet, _
