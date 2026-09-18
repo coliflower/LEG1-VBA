@@ -2201,9 +2201,14 @@ Private Sub EndgueltigeSchriftfarbenSetzen( _
 
             Else
 
+                ' Nur die Basisdaten werden hier auf die automatische
+                ' Schriftfarbe zurückgesetzt. Die nachfolgenden Bereiche
+                ' (z. B. Carter/Chests) haben ihre eigenen Prüfungen und
+                ' Markierungslogiken, die unmittelbar davor bereits die
+                ' korrekten Einzelzellfarben gesetzt haben.
                 ws.Range( _
                     ws.Cells(i, cSpieler), _
-                    ws.Cells(i, cEnde)).Font.ColorIndex = _
+                    ws.Cells(i, cBasisdaten)).Font.ColorIndex = _
                     xlAutomatic
 
             End If
