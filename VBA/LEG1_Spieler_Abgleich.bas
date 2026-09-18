@@ -3993,22 +3993,11 @@ Private Sub VaultsNameSicherstellen( _
     Dim nm As name
     Dim rngZiel As Range
     Dim zielBezug As String
-    Dim letzteZeile As Long
 
     ' Der Name der Vaults-Datenspalte umfasst die komplette
-    ' Dashboard-Spalte vom Summenmarker bis zur letzten
-    ' aktuellen Dashboard-Zeile.
-    letzteZeile = wsDash.Cells( _
-        wsDash.Rows.Count, _
-        c).End(xlUp).Row
-
-    If letzteZeile < zeileSummen Then
-        letzteZeile = zeileSummen
-    End If
-
-    Set rngZiel = wsDash.Range( _
-        wsDash.Cells(zeileSummen, c), _
-        wsDash.Cells(letzteZeile, c))
+    ' Excel-Spalte. Dadurch wird z. B. aus Spalte AT
+    ' tatsächlich der Bereich $AT:$AT.
+    Set rngZiel = wsDash.Columns(c)
 
     zielBezug = "=" & _
         wsDash.Name & "!" & _
