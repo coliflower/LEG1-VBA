@@ -107,7 +107,6 @@ Public Sub LEG1_Spieler_Abgleich()
     Dim verarbeitetSpieler As Collection
 
     Dim neueZeilen As Collection
-    Dim wiederAktiveZeilen As Collection
 
     Dim alterCalc As XlCalculation
     Dim alterScreenUpdating As Boolean
@@ -239,7 +238,6 @@ Public Sub LEG1_Spieler_Abgleich()
         zeileSpieler1
 
     Set neueZeilen = New Collection
-    Set wiederAktiveZeilen = New Collection
 
     schritt = "Sortierung prüfen"
 
@@ -406,16 +404,6 @@ NaechsterUpdateSpielerEinlesen:
                     cBasisdaten).Value = 1
 
                 wiederAktiv = wiederAktiv + 1
-
-                If Not CollectionKeyExistiert( _
-                        wiederAktiveZeilen, _
-                        CStr(dashZeile)) Then
-
-                    wiederAktiveZeilen.Add _
-                        dashZeile, _
-                        CStr(dashZeile)
-
-                End If
 
                 LogEintrag _
                     wsLog, _
@@ -651,7 +639,6 @@ NaechsterUpdateSpielerNeu:
         cBasisdaten, _
         letzteZeileDash, _
         neueZeilen, _
-        wiederAktiveZeilen, _
         cSpieler, _
         cLetzterNOK, _
         zeileSpieler1
@@ -2160,19 +2147,14 @@ Private Sub EndgueltigeSchriftfarbenSetzen( _
     ByVal cBasisdaten As Long, _
     ByVal letzteZeile As Long, _
     ByVal neueZeilen As Collection, _
-    ByVal wiederAktiveZeilen As Collection, _
     ByVal cSpieler As Long, _
     ByVal cLetzterNOK As Long, _
     ByVal zeileSpieler1 As Long)
 
     Dim i As Long
-    Dim cEnde As Long
 
     If letzteZeile < zeileSpieler1 Then Exit Sub
-
-    cEnde = cLetzterNOK
-
-    If cEnde < cSpieler Then Exit Sub
+    If cLetzterNOK < cSpieler Then Exit Sub
 
     For i = zeileSpieler1 To letzteZeile
 
@@ -2600,59 +2582,6 @@ Private Sub NOKFarbenSetzen( _
         End If
 
     Next j
-
-End Sub
-
-' ============================================================
-' CARTER_NOK FARBEN SETZEN
-' ============================================================
-
-Private Sub CarterNOKFarbenSetzen( _
-    ByVal ws As Worksheet, _
-    ByVal cCarterNOK As Long, _
-    ByVal zeileSpieler1 As Long, _
-    ByVal letzteZeile As Long)
-
-    Dim i As Long
-    Dim wert As Double
-
-    If cCarterNOK <= 0 Then Exit Sub
-    If letzteZeile < zeileSpieler1 Then Exit Sub
-
-    For i = zeileSpieler1 To letzteZeile
-
-        If NumerischerWert( _
-                ws.Cells( _
-                    i, _
-                    cCarterNOK).Value, _
-                wert) Then
-
-            If wert > 0 Then
-
-                ws.Cells( _
-                    i, _
-                    cCarterNOK).Font.Color = _
-                    RGB(255, 0, 0)
-
-            Else
-
-                ws.Cells( _
-                    i, _
-                    cCarterNOK).Font.ColorIndex = _
-                    xlAutomatic
-
-            End If
-
-        Else
-
-            ws.Cells( _
-                i, _
-                cCarterNOK).Font.ColorIndex = _
-                xlAutomatic
-
-        End If
-
-    Next i
 
 End Sub
 
@@ -3128,58 +3057,6 @@ Private Sub ChestsNOKAlleSpielerZuruecksetzen( _
         wsDash.Cells(zeileSpieler1, cChestsNOK), _
         wsDash.Cells(letzteZeileDash, cChestsNOK)).Font.ColorIndex = _
         xlAutomatic
-
-End Sub
-
-' ============================================================
-' CHESTS_NOK FARBEN SETZEN
-' ============================================================
-
-Private Sub ChestsNOKFarbenSetzen( _
-    ByVal ws As Worksheet, _
-    ByVal cBasisdaten As Long, _
-    ByVal cChestsNOK As Long, _
-    ByVal zeileSpieler1 As Long, _
-    ByVal letzteZeile As Long)
-
-    Dim i As Long
-    Dim cStart As Long
-    Dim cEnde As Long
-    If cChestsNOK <= 0 Then Exit Sub
-    If cBasisdaten <= 0 Then Exit Sub
-    If letzteZeile < zeileSpieler1 Then Exit Sub
-
-    If Not BereichsGrenzenFuerNOKMarkerErmitteln( _
-            ws, _
-            cBasisdaten, _
-            cChestsNOK, _
-            cStart, _
-            cEnde) Then
-
-        For i = zeileSpieler1 To letzteZeile
-
-            ws.Cells( _
-                i, _
-                cChestsNOK).Value = 0
-
-            ws.Cells( _
-                i, _
-                cChestsNOK).Font.ColorIndex = _
-                xlAutomatic
-
-        Next i
-
-        Exit Sub
-
-    End If
-
-    ChestsNOKProSpielerNeu _
-        ws, _
-        cStart, _
-        cEnde, _
-        cChestsNOK, _
-        zeileSpieler1, _
-        letzteZeile
 
 End Sub
 
