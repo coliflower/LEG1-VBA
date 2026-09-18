@@ -2377,7 +2377,6 @@ Private Sub CarterBereichPruefen( _
     Dim schwelle As Double
     Dim wert As Double
     Dim anzahlUnterSchwelle As Long
-    Dim anzahlUnterSchwelleSpalte As Long
     Dim schwelleGueltig As Boolean
 
     If cBasisdaten <= 0 Then Exit Sub
@@ -2425,28 +2424,20 @@ Private Sub CarterBereichPruefen( _
 
     End If
 
-    ' Zuerst alte rote Markierungen im Carter-Bereich entfernen.
-    ' Die tatsächliche Prüfung erfolgt anschließend gegen den
-    ' Schwellenwert in Dashboard_3_schwelle_2 derselben Spalte.
+    ' Alte rote Markierungen und alte Zählungen in Zeile 1 entfernen.
     wsDash.Range( _
         wsDash.Cells(zeileSpieler1, cBereichStart), _
         wsDash.Cells(letzteZeile, cBereichEnde)).Font.ColorIndex = _
         xlAutomatic
 
-    ' Zeile 1 enthält je Carter-Spalte die Anzahl der Spieler,
-    ' die den jeweiligen Schwellenwert nicht erreichen.
     wsDash.Range( _
         wsDash.Cells(1, cBereichStart), _
         wsDash.Cells(1, cBereichEnde)).ClearContents
 
-    ' Carter_NOK enthält pro Spieler die Anzahl der
-    ' Carter-Werte, die den jeweiligen Schwellenwert nicht erreichen.
-    For c = cBereichStart To cBereichEnde
-
-        anzahlUnterSchwelleSpalte = 0
-
-    Next c
-
+    ' Carter_NOK enthält pro Spieler die Anzahl der Carter-Werte,
+    ' die den jeweiligen Schwellenwert nicht erreichen.
+    ' In Zeile 1 wird je Carter-Spalte gezählt, wie viele Spieler
+    ' in dieser Spalte NOK sind.
     For i = zeileSpieler1 To letzteZeile
 
         anzahlUnterSchwelle = 0
@@ -2473,8 +2464,8 @@ Private Sub CarterBereichPruefen( _
                         anzahlUnterSchwelle = _
                             anzahlUnterSchwelle + 1
 
-                        anzahlUnterSchwelleSpalte = _
-                            anzahlUnterSchwelleSpalte + 1
+                        wsDash.Cells(1, c).Value = _
+                            CLng(wsDash.Cells(1, c).Value) + 1
 
                         wsDash.Cells( _
                             i, _
@@ -2498,8 +2489,8 @@ Private Sub CarterBereichPruefen( _
                     anzahlUnterSchwelle = _
                         anzahlUnterSchwelle + 1
 
-                    anzahlUnterSchwelleSpalte = _
-                        anzahlUnterSchwelleSpalte + 1
+                    wsDash.Cells(1, c).Value = _
+                        CLng(wsDash.Cells(1, c).Value) + 1
 
                     wsDash.Cells( _
                         i, _
@@ -2518,14 +2509,6 @@ Private Sub CarterBereichPruefen( _
                     c).Font.ColorIndex = _
                     xlAutomatic
 
-            End If
-
-        Next c
-
-        For c = cBereichStart To cBereichEnde
-
-            If anzahlUnterSchwelleSpalte > 0 Then
-                wsDash.Cells(1, c).Value = anzahlUnterSchwelleSpalte
             End If
 
         Next c
