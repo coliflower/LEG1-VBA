@@ -997,7 +997,8 @@ Private Function NOKMarkerSpaltenErmitteln( _
     Dim nm As name
     Dim rng As Range
     Dim nameText As String
-    Dim anzahl As Long    Dim i As Long
+    Dim anzahl As Long
+    Dim i As Long
     Dim j As Long
     Dim temp As Long
 
