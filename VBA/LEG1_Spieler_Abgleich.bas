@@ -1794,7 +1794,8 @@ Private Sub DatenUebernehmen( _
     ByVal cRang As Long, _
     ByVal cH As Long, _
     ByVal cMacht As Long, _
-    ByVal cG As Long, _    ByVal cM As Long, _
+    ByVal cG As Long, _
+    ByVal cM As Long, _
     ByVal cS As Long, _
     ByVal cE As Long, _
     ByVal cJoined As Long, _
