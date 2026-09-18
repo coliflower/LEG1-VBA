@@ -3429,9 +3429,8 @@ Private Sub VaultsBereichPruefen( _
         cStart = letzterNOKVorher + 1
         cNOK = cStart + anzahlBlaetter
 
-        wsDash.Columns(cStart).Resize( _
-            ColumnSize:=anzahlBlaetter + 1).Insert _
-                Shift:=xlToRight
+        ' Der neue Testbereich wird rechts neben dem bisher letzten
+        ' _NOK-Marker angelegt. Bestehende Bereiche bleiben unverändert.
 
         ThisWorkbook.Names.Add _
             name:="Vaults_NOK", _
