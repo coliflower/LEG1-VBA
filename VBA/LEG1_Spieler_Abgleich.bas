@@ -2152,9 +2152,12 @@ Private Sub EndgueltigeSchriftfarbenSetzen( _
     ByVal zeileSpieler1 As Long)
 
     Dim i As Long
+    Dim cEnde As Long
+
+    cEnde = cLetzterNOK
 
     If letzteZeile < zeileSpieler1 Then Exit Sub
-    If cLetzterNOK < cSpieler Then Exit Sub
+    If cEnde < cSpieler Then Exit Sub
 
     For i = zeileSpieler1 To letzteZeile
 
