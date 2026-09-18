@@ -3949,7 +3949,9 @@ Private Sub VaultsNOKNameSicherstellen( _
     Dim rngZiel As Range
     Dim zielBezug As String
 
-    Set rngZiel = wsDash.Cells(zeileBezuege, cNOK)
+    ' Der Vaults_NOK-Marker bezeichnet die komplette Excel-Spalte.
+    ' Beispiel: Spalte AT -> $AT:$AT.
+    Set rngZiel = wsDash.Columns(cNOK)
 
     zielBezug = "=" & _
         wsDash.Name & "!" & _
