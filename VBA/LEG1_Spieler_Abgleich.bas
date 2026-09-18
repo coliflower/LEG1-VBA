@@ -997,8 +997,7 @@ Private Function NOKMarkerSpaltenErmitteln( _
     Dim nm As name
     Dim rng As Range
     Dim nameText As String
-    Dim anzahl As Long
-    Dim i As Long
+    Dim anzahl As Long    Dim i As Long
     Dim j As Long
     Dim temp As Long
 
@@ -1998,7 +1997,6 @@ Private Sub NeueSpielerFarbeSetzen( _
     ByVal ws As Worksheet, _
     ByVal zeile As Long, _    ByVal cSpieler As Long, _
     ByVal cLetzterNOK As Long)
-
     Dim cEnde As Long
 
     cEnde = cLetzterNOK
@@ -2672,6 +2670,16 @@ Private Sub ChestsSpaltenPruefen( _
 
     End If
 
+    ' Vor der vollständigen Chests-Prüfung alte Zählungen zurücksetzen.
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cChestsNOK), _
+        wsDash.Cells(letzteZeileDash, cChestsNOK)).Value = 0
+
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cChestsNOK), _
+        wsDash.Cells(letzteZeileDash, cChestsNOK)).Font.ColorIndex = _
+        xlAutomatic
+
     For c = cBereichStart To cBereichEnde
 
         kopf = SichererText( _
@@ -2702,7 +2710,8 @@ Private Sub ChestsSpaltenPruefen( _
     Next c
 
     Set wbChests = ChestsArbeitsmappeOeffnen( _
-        wsLog, _        wbWarBereitsOffen)
+        wsLog, _
+        wbWarBereitsOffen)
 
     If wbChests Is Nothing Then
 
@@ -2864,7 +2873,7 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
     ByVal cDash As Long, _
     ByVal datum As Date, _
     ByVal zeileSchwelle2 As Long, _
-    ByVal cSpieler As Long,
+    ByVal cSpieler As Long, _
     ByVal cChestsNOK As Long, _
     ByVal zeileSpieler1 As Long, _
     ByVal letzteZeileDash As Long, _
@@ -2997,8 +3006,7 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
             wertGefunden = _
                 CollectionKeyExistiert( _
                     spielerWerte, _
-                    key)
-            If wertGefunden Then
+                    key)            If wertGefunden Then
 
                 wert = CollectionWert( _
                     spielerWerte, _
