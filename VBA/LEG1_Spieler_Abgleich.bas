@@ -1996,7 +1996,8 @@ End Sub
 
 Private Sub NeueSpielerFarbeSetzen( _
     ByVal ws As Worksheet, _
-    ByVal zeile As Long, _    ByVal cSpieler As Long, _
+    ByVal zeile As Long, _
+    ByVal cSpieler As Long, _
     ByVal cLetzterNOK As Long)
     Dim cEnde As Long
 
