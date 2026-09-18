@@ -997,7 +997,8 @@ Private Function VorherigerNOKMarker( _
     On Error GoTo 0
 
     If besteSpalte > untergrenze Then
-        VorherigerNOKMarker = besteSpalte    Else
+        VorherigerNOKMarker = besteSpalte
+    Else
         VorherigerNOKMarker = untergrenze
     End If
 
