@@ -997,7 +997,6 @@ Private Function NOKMarkerSpaltenErmitteln( _
     Dim nm As name
     Dim rng As Range
     Dim nameText As String
-
     Dim anzahl As Long
     Dim i As Long
     Dim j As Long
@@ -1997,8 +1996,7 @@ End Sub
 
 Private Sub NeueSpielerFarbeSetzen( _
     ByVal ws As Worksheet, _
-    ByVal zeile As Long, _
-    ByVal cSpieler As Long, _
+    ByVal zeile As Long, _    ByVal cSpieler As Long, _
     ByVal cLetzterNOK As Long)
 
     Dim cEnde As Long
@@ -2733,6 +2731,7 @@ Private Sub ChestsSpaltenPruefen( _
                 datum, _
                 zeileSchwelle2, _
                 cSpieler, _
+                cChestsNOK, _
                 zeileSpieler1, _
                 letzteZeileDash, _
                 wsLog
@@ -2865,7 +2864,8 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
     ByVal cDash As Long, _
     ByVal datum As Date, _
     ByVal zeileSchwelle2 As Long, _
-    ByVal cSpieler As Long, _
+    ByVal cSpieler As Long,
+    ByVal cChestsNOK As Long, _
     ByVal zeileSpieler1 As Long, _
     ByVal letzteZeileDash As Long, _
     ByVal wsLog As Worksheet)
@@ -2998,7 +2998,6 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
                 CollectionKeyExistiert( _
                     spielerWerte, _
                     key)
-
             If wertGefunden Then
 
                 wert = CollectionWert( _
@@ -3087,7 +3086,8 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
                 If NumerischerWert(wert, zahl) Then
 
                     If zahl < schwelle Then
-                        wsDash.Cells(i, cDash).Font.Color = RGB(255, 0, 0)
+                        wsDash.Cells(i, cChestsNOK).Value = _
+                            CLng(wsDash.Cells(i, cChestsNOK).Value) + 1
                     End If
 
                 End If
