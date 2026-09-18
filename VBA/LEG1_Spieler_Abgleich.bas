@@ -2422,7 +2422,7 @@ Private Sub CarterBereichPruefen( _
 
     End If
 
-    ' Alte rote Markierungen, alte Zeile-1-Zählungen und alte Chests_NOK-Werte entfernen.
+    ' Alte rote Markierungen und alte Zeile-1-Zählungen entfernen.
     wsDash.Range( _
         wsDash.Cells(zeileSpieler1, cBereichStart), _
         wsDash.Cells(letzteZeile, cBereichEnde)).Font.ColorIndex = _
@@ -2431,15 +2431,6 @@ Private Sub CarterBereichPruefen( _
     wsDash.Range( _
         wsDash.Cells(1, cBereichStart), _
         wsDash.Cells(1, cBereichEnde)).ClearContents
-
-    wsDash.Range( _
-        wsDash.Cells(zeileSpieler1, cChestsNOK), _
-        wsDash.Cells(letzteZeile, cChestsNOK)).Value = 0
-
-    wsDash.Range( _
-        wsDash.Cells(zeileSpieler1, cChestsNOK), _
-        wsDash.Cells(letzteZeile, cChestsNOK)).Font.ColorIndex = _
-        xlAutomatic
 
     ' Carter_NOK enthält pro Spieler die Anzahl der Carter-Werte,
     ' die den jeweiligen Schwellenwert nicht erreichen.
