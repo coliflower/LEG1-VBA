@@ -2642,6 +2642,9 @@ Private Sub TB_BereichsformatierungSetzen( _
                 ' Datenspalte links davon.
                 ' ------------------------------------------------
 
+                ' Die Breite des _NOK-Markers entspricht immer
+                ' exakt der letzten Datenspalte des Bereichs.
+                ws.Columns(cNOK).Hidden = False
                 ws.Columns(cNOK).ColumnWidth = _
                     ws.Columns(cEnde).ColumnWidth
 
@@ -2733,6 +2736,15 @@ Private Sub BereichsDatenspaltenGruppieren( _
         End If
 
     Next i
+
+    ' Nach dem Gruppieren alle Bereichs-Datenspalten wieder
+    ' auf der Detailstufe anzeigen. Die Gruppierung bleibt
+    ' erhalten und kann weiterhin über das Outline ein-/ausgeblendet
+    ' werden. Dadurch werden bestehende Bereiche wie Carter, Vaults
+    ' und Chests nicht versehentlich dauerhaft ausgeblendet.
+    On Error Resume Next
+    ws.Outline.ShowLevels ColumnLevels:=2
+    On Error GoTo 0
 
 End Sub
 
