@@ -2656,7 +2656,9 @@ Private Sub TB_BereichsformatierungSetzen( _
 
                 With ws.Cells(zeileBezuege, cNOK)
 
-                    .Orientation = xlUpward
+                    .Orientation = xlHorizontal
+                    .HorizontalAlignment = xlCenter
+                    .VerticalAlignment = xlBottom
                     .Font.Color = RGB(255, 0, 0)
                     .Font.Size = 9
                     .Interior.Pattern = xlNone
@@ -2684,6 +2686,9 @@ Private Sub BereichsDatenspaltenGruppieren( _
     Dim c As Long
     Dim bereitsGruppiert As Boolean
 
+    Dim bereichWarOffen() As Boolean
+    Dim bereichGueltig() As Boolean
+
     If ws Is Nothing Then Exit Sub
     If cBasisdaten <= 0 Then Exit Sub
 
@@ -2692,6 +2697,58 @@ Private Sub BereichsDatenspaltenGruppieren( _
         markerSpalten)
 
     If markerAnzahl <= 0 Then Exit Sub
+
+    ReDim bereichWarOffen(1 To markerAnzahl)
+    ReDim bereichGueltig(1 To markerAnzahl)
+
+    ' ------------------------------------------------------------
+    ' AKTUELLEN ZUSTAND DER BEREICHE MERKEN
+    '
+    ' Ein Bereich gilt als offen, wenn alle seine Datenspalten
+    ' sichtbar sind. Ist mindestens eine Datenspalte ausgeblendet,
+    ' wird der Bereich als geschlossen behandelt.
+    '
+    ' Dieser Zustand wird vor dem Gruppieren gesichert, damit der
+    ' Abgleich die vom Benutzer gewählte Ansicht nicht verändert.
+    ' ------------------------------------------------------------
+
+    For i = 1 To markerAnzahl
+
+        cStart = 0
+        cEnde = -1
+
+        If BereichsGrenzenFuerNOKMarkerErmitteln( _
+                ws, _
+                cBasisdaten, _
+                markerSpalten(i), _
+                cStart, _
+                cEnde) Then
+
+            If cStart <= cEnde Then
+
+                bereichGueltig(i) = True
+                bereichWarOffen(i) = True
+
+                For c = cStart To cEnde
+
+                    If ws.Columns(c).Hidden Then
+
+                        bereichWarOffen(i) = False
+                        Exit For
+
+                    End If
+
+                Next c
+
+            End If
+
+        End If
+
+    Next i
+
+    ' ------------------------------------------------------------
+    ' BEREICHE GRUPPIEREN
+    ' ------------------------------------------------------------
 
     For i = 1 To markerAnzahl
 
@@ -2738,26 +2795,35 @@ Private Sub BereichsDatenspaltenGruppieren( _
 
     Next i
 
-    ' Die Datenspalten der Bereiche bleiben nach dem Gruppieren
-    ' ausgeblendet. Die _NOK-Marker bleiben dagegen immer sichtbar.
-    ' Dadurch ist der Bereich über die _NOK-Spalte sichtbar, während
-    ' die Detaildaten über die Gruppierung eingeblendet werden können.
+    ' ------------------------------------------------------------
+    ' URSPRÜNGLICHEN OFFEN/GESCHLOSSEN-ZUSTAND WIEDERHERSTELLEN
+    '
+    ' Die _NOK-Marker bleiben immer sichtbar.
+    ' ------------------------------------------------------------
+
     For i = 1 To markerAnzahl
 
         cStart = 0
         cEnde = -1
 
-        If BereichsGrenzenFuerNOKMarkerErmitteln( _
-                ws, _
-                cBasisdaten, _
-                markerSpalten(i), _
-                cStart, _
-                cEnde) Then
+        If bereichGueltig(i) Then
 
-            If cStart <= cEnde Then
-                ws.Range( _
-                    ws.Columns(cStart), _
-                    ws.Columns(cEnde)).EntireColumn.Hidden = True
+            If BereichsGrenzenFuerNOKMarkerErmitteln( _
+                    ws, _
+                    cBasisdaten, _
+                    markerSpalten(i), _
+                    cStart, _
+                    cEnde) Then
+
+                If cStart <= cEnde Then
+
+                    ws.Range( _
+                        ws.Columns(cStart), _
+                        ws.Columns(cEnde)).EntireColumn.Hidden = _
+                        Not bereichWarOffen(i)
+
+                End If
+
             End If
 
         End If
