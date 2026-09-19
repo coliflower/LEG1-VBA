@@ -1542,6 +1542,7 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
 
                     TBBereichVorhandenAktualisieren _
                         wsDash, _
+                        cBasisdaten, _
                         cNOK, _
                         zeileSummen, _
                         zeileSchwelle1, _
@@ -2170,6 +2171,7 @@ End Sub
 
 Private Sub TBBereichVorhandenAktualisieren( _
     ByVal wsDash As Worksheet, _
+    ByVal cBasisdaten As Long, _
     ByVal cNOK As Long, _
     ByVal zeileSummen As Long, _
     ByVal zeileSchwelle1 As Long, _
