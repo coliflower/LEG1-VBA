@@ -2617,6 +2617,11 @@ Private Sub TB_BereichsformatierungSetzen( _
 
                 End With
 
+                ' Zeile 1 des _NOK-Markers enthält immer die Anzahl
+                ' der Datenspalten des unmittelbar davorliegenden Bereichs.
+                ws.Cells(1, cNOK).Value = cEnde - cStart + 1
+                ws.Cells(1, cNOK).NumberFormat = "#,##0"
+
                 ' ------------------------------------------------
                 ' _NOK-MARKER
                 ' Die Breite entspricht immer der Breite des
