@@ -8,7 +8,6 @@ Private Const DashboardBlattName As String = "dashboard"
 Private Const UpdateBlattName As String = "update"
 
 Private Const CHESTS_DATEI As String = "TB__Chests.xlsx"
-Private Const VAULTS_DATEI As String = "TB__Vaults.xlsx"
 
 ' ------------------------------------------------------------
 ' Dashboard - definierte Namen / Name Manager
@@ -629,21 +628,6 @@ NaechsterUpdateSpielerNeu:
         zeileSchwelle2, _
         zeileBezuege, _
         cSpieler, _
-        zeileSpieler1, _
-        letzteZeileDash, _
-        wsLog
-
-    schritt = "Vaults-Bereich erkennen und prüfen"
-
-    VaultsBereichPruefen _
-        wsDash, _
-        cBasisdaten, _
-        zeileSummen, _
-        zeileSchwelle1, _
-        zeileSchwelle2, _
-        zeileBezuege, _
-        cSpieler, _
-        cT9, _
         zeileSpieler1, _
         letzteZeileDash, _
         wsLog
@@ -1491,8 +1475,9 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
     End If
 
     ' Alle TB__*.xlsx-Dateien im Verzeichnis der LEG1-Arbeitsmappe
-    ' werden geprüft. Chests und Vaults besitzen bereits eigene
-    ' spezialisierte Prüfungen und werden deshalb hier übersprungen.
+    ' werden nach derselben generischen Bereichslogik geprüft.
+    ' Chests bleibt als Sonderformat ausgenommen, da dessen
+    ' Datenstruktur datumsbezogen ist.
     On Error GoTo ScanFehler
 
     dateiname = Dir( _
@@ -1505,10 +1490,6 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
         If StrComp( _
                 dateiname, _
                 CHESTS_DATEI, _
-                vbTextCompare) <> 0 And _
-           StrComp( _
-                dateiname, _
-                VAULTS_DATEI, _
                 vbTextCompare) <> 0 Then
 
             bereichsName = dateiname
@@ -1681,7 +1662,7 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
                         dashboardWert = Empty
 
                         hatSchwelle1 = _
-                            VaultsWertFuerDashboard( _
+                            TBWertFuerDashboard( _
                                 wsQuelle.Cells(1, 4).Value, _
                                 dashboardWert) > 0
 
@@ -1699,7 +1680,7 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
                         dashboardWert = Empty
 
                         hatSchwelle2 = _
-                            VaultsWertFuerDashboard( _
+                            TBWertFuerDashboard( _
                                 wsQuelle.Cells(1, 5).Value, _
                                 dashboardWert) > 0
 
@@ -1785,7 +1766,7 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
 
                                     dashboardWert = Empty
 
-                                    If VaultsWertFuerDashboard( _
+                                    If TBWertFuerDashboard( _
                                             wert, _
                                             dashboardWert) > 0 Then
 
@@ -1842,7 +1823,7 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
 
                                     If pruefen Then
 
-                                        If VaultsWertUnterSchwelle( _
+                                        If TBWertUnterSchwelle( _
                                                 wert, _
                                                 schwelleVerwenden, _
                                                 istBewertbar) Then
@@ -2331,7 +2312,7 @@ Private Sub TBBereichVorhandenAktualisieren( _
             dashboardWert = Empty
 
             hatSchwelle1 = _
-                VaultsWertFuerDashboard( _
+                TBWertFuerDashboard( _
                     wsQuelle.Cells(1, 4).Value, _
                     dashboardWert) > 0
 
@@ -2345,7 +2326,7 @@ Private Sub TBBereichVorhandenAktualisieren( _
             dashboardWert = Empty
 
             hatSchwelle2 = _
-                VaultsWertFuerDashboard( _
+                TBWertFuerDashboard( _
                     wsQuelle.Cells(1, 5).Value, _
                     dashboardWert) > 0
 
@@ -2422,7 +2403,7 @@ Private Sub TBBereichVorhandenAktualisieren( _
 
                         dashboardWert = Empty
 
-                        If VaultsWertFuerDashboard( _
+                        If TBWertFuerDashboard( _
                                 wert, _
                                 dashboardWert) > 0 Then
 
@@ -2472,7 +2453,7 @@ Private Sub TBBereichVorhandenAktualisieren( _
 
                         If pruefen Then
 
-                            If VaultsWertUnterSchwelle( _
+                            If TBWertUnterSchwelle( _
                                     wert, _
                                     schwelleVerwenden, _
                                     istBewertbar) Then
@@ -3041,7 +3022,7 @@ End Function
 ' WERTTYP FÜR VAULTS ERMITTELN
 ' ============================================================
 
-Private Function VaultsWertTypErmitteln( _
+Private Function TBWertTypErmitteln( _
     ByVal wert As Variant, _
     ByRef zahl As Double, _
     ByRef boolWert As Boolean) As Long
@@ -3052,7 +3033,7 @@ Private Function VaultsWertTypErmitteln( _
 
     Dim textWert As String
 
-    VaultsWertTypErmitteln = VAULTS_WERT_UNGUELTIG
+    TBWertTypErmitteln = VAULTS_WERT_UNGUELTIG
     zahl = 0
     boolWert = False
 
@@ -3063,7 +3044,7 @@ Private Function VaultsWertTypErmitteln( _
     If VarType(wert) = vbBoolean Then
 
         boolWert = CBool(wert)
-        VaultsWertTypErmitteln = VAULTS_WERT_BOOLEAN
+        TBWertTypErmitteln = VAULTS_WERT_BOOLEAN
         Exit Function
 
     End If
@@ -3075,7 +3056,7 @@ Private Function VaultsWertTypErmitteln( _
     If IsNumeric(wert) Then
 
         zahl = CDbl(wert)
-        VaultsWertTypErmitteln = VAULTS_WERT_ZAHL
+        TBWertTypErmitteln = VAULTS_WERT_ZAHL
         Exit Function
 
     End If
@@ -3085,12 +3066,12 @@ Private Function VaultsWertTypErmitteln( _
         Case "WAHR", "TRUE"
 
             boolWert = True
-            VaultsWertTypErmitteln = VAULTS_WERT_BOOLEAN
+            TBWertTypErmitteln = VAULTS_WERT_BOOLEAN
 
         Case "FALSCH", "FALSE"
 
             boolWert = False
-            VaultsWertTypErmitteln = VAULTS_WERT_BOOLEAN
+            TBWertTypErmitteln = VAULTS_WERT_BOOLEAN
 
     End Select
 
@@ -3100,20 +3081,20 @@ End Function
 ' VAULTS-WERT FÜR DAS DASHBOARD AUFBEREITEN
 ' ============================================================
 
-Private Function VaultsWertFuerDashboard( _
+Private Function TBWertFuerDashboard( _
     ByVal wert As Variant, _
     ByRef dashboardWert As Variant) As Long
 
     Dim zahl As Double
     Dim boolWert As Boolean
 
-    VaultsWertFuerDashboard = _
-        VaultsWertTypErmitteln( _
+    TBWertFuerDashboard = _
+        TBWertTypErmitteln( _
             wert, _
             zahl, _
             boolWert)
 
-    Select Case VaultsWertFuerDashboard
+    Select Case TBWertFuerDashboard
 
         Case 1
 
@@ -3139,7 +3120,7 @@ End Function
 ' VAULTS-WERT GEGEN SCHWELLENWERT BEWERTEN
 ' ============================================================
 
-Private Function VaultsWertUnterSchwelle( _
+Private Function TBWertUnterSchwelle( _
     ByVal wert As Variant, _
     ByVal schwellenwert As Variant, _
     ByRef istBewertbar As Boolean) As Boolean
@@ -3157,14 +3138,14 @@ Private Function VaultsWertUnterSchwelle( _
     Const VAULTS_WERT_BOOLEAN As Long = 2
 
     istBewertbar = False
-    VaultsWertUnterSchwelle = False
+    TBWertUnterSchwelle = False
 
-    wertTyp = VaultsWertTypErmitteln( _
+    wertTyp = TBWertTypErmitteln( _
         wert, _
         wertZahl, _
         wertBoolean)
 
-    schwellenTyp = VaultsWertTypErmitteln( _
+    schwellenTyp = TBWertTypErmitteln( _
         schwellenwert, _
         schwellenZahl, _
         schwellenBoolean)
@@ -3173,7 +3154,7 @@ Private Function VaultsWertUnterSchwelle( _
        schwellenTyp = VAULTS_WERT_ZAHL Then
 
         istBewertbar = True
-        VaultsWertUnterSchwelle = _
+        TBWertUnterSchwelle = _
             (wertZahl < schwellenZahl)
 
         Exit Function
@@ -3188,7 +3169,7 @@ Private Function VaultsWertUnterSchwelle( _
         ' False = 0, True = 1.
         ' Damit wird auch ein boolescher Schwellenwert
         ' eindeutig und ohne VBA-Sonderbehandlung bewertet.
-        VaultsWertUnterSchwelle = _
+        TBWertUnterSchwelle = _
             (Not wertBoolean And schwellenBoolean)
 
     End If
@@ -4962,546 +4943,19 @@ End Sub
 ' VAULTS-BEREICH ERKENNEN UND PRÜFEN
 ' ============================================================
 
-Private Sub VaultsBereichPruefen( _
-    ByVal wsDash As Worksheet, _
-    ByVal cBasisdaten As Long, _
-    ByVal zeileSummen As Long, _
-    ByVal zeileSchwelle1 As Long, _
-    ByVal zeileSchwelle2 As Long, _
-    ByVal zeileBezuege As Long, _
-    ByVal cSpieler As Long, _
-    ByVal cT9 As Long, _
-    ByVal zeileSpieler1 As Long, _
-    ByVal letzteZeileDash As Long, _
-    ByVal wsLog As Worksheet)
 
-    Dim wbVaults As Workbook
-    Dim wsQuelle As Worksheet
-
-    Dim cNOK As Long
-    Dim cStart As Long
-    Dim c As Long
-    Dim i As Long
-
-    Dim blattIndex As Long
-    Dim anzahlBlaetter As Long
-    Dim blattName As String
-    Dim nameText As String
-    Dim bereichsName As String
-
-    Dim schwelle1 As Variant
-    Dim schwelle2 As Variant
-    Dim hatSchwelle1 As Boolean
-    Dim hatSchwelle2 As Boolean
-
-    Dim wert As Variant
-    Dim dashboardWert As Variant
-    Dim schwelleVerwenden As Variant
-
-    Dim spieler As String
-    Dim key As String
-    Dim letzteZeileQuelle As Long
-
-    Dim spielerWerte As Collection
-
-    Dim anzahlAktiveUnterSchwelle As Long
-    Dim wertGefunden As Boolean
-    Dim pruefen As Boolean
-    Dim istBewertbar As Boolean
-
-    Dim warBereitsOffen As Boolean
-    Dim letzterNOKVorher As Long
-
-    If Len(ThisWorkbook.Path) = 0 Then Exit Sub
-
-    If Dir(ThisWorkbook.Path & Application.PathSeparator & VAULTS_DATEI) = "" Then Exit Sub
-
-    On Error Resume Next
-
-    Set wbVaults = Workbooks(VAULTS_DATEI)
-
-    On Error GoTo 0
-
-    If wbVaults Is Nothing Then
-
-        On Error GoTo OeffnenFehler
-
-        Set wbVaults = Workbooks.Open( _
-            FileName:=ThisWorkbook.Path & Application.PathSeparator & VAULTS_DATEI, _
-            UpdateLinks:=0, _
-            ReadOnly:=True)
-
-        On Error GoTo 0
-
-    Else
-
-        warBereitsOffen = True
-
-    End If
-
-    If wbVaults Is Nothing Then Exit Sub
-
-    bereichsName = VAULTS_DATEI
-
-    If Left$(bereichsName, 4) = "TB__" Then
-        bereichsName = Mid$(bereichsName, 5)
-    End If
-
-    If LCase$(Right$(bereichsName, 5)) = ".xlsx" Then
-        bereichsName = Left$(bereichsName, Len(bereichsName) - 5)
-    End If
-
-    On Error Resume Next
-
-    cNOK = DashboardSpalte( _
-        wsDash, _
-        "Vaults_NOK")
-
-    On Error GoTo 0
-
-    anzahlBlaetter = wbVaults.Worksheets.Count
-
-    If anzahlBlaetter = 0 Then GoTo Aufraeumen
-
-    If cNOK = 0 Then
-
-        letzterNOKVorher = LetzterNOKMarker(wsDash)
-
-        If letzterNOKVorher <= 0 Then GoTo Aufraeumen
-
-        cStart = letzterNOKVorher + 1
-        cNOK = cStart + anzahlBlaetter
-
-        ' Der neue Bereich wird rechts neben dem bisher letzten
-        ' _NOK-Marker angelegt. Bestehende Bereiche bleiben unverändert.
-
-        VaultsNOKNameSicherstellen _
-            wsDash, _
-            cNOK, _
-            zeileBezuege
-
-    Else
-
-        cStart = cNOK - anzahlBlaetter
-
-        If cStart <= 0 Then GoTo Aufraeumen
-
-    End If
-
-    If cStart <= 0 Or cNOK <= cStart Then GoTo Aufraeumen
-
-    ' Den _NOK-Marker immer auf die richtige Dashboard-Zelle setzen.
-    VaultsNOKNameSicherstellen _
-        wsDash, _
-        cNOK, _
-        zeileBezuege
-
-    wsDash.Cells(zeileBezuege, cNOK).Value = bereichsName
-
-    wsDash.Range( _
-        wsDash.Cells(zeileSpieler1, cNOK), _
-        wsDash.Cells(letzteZeileDash, cNOK)).Value = 0
-
-    For blattIndex = 1 To anzahlBlaetter
-
-        Set wsQuelle = wbVaults.Worksheets(blattIndex)
-
-        c = cStart + blattIndex - 1
-        blattName = SichererText(wsQuelle.Name)
-
-        wsDash.Cells(1, c).Value = 0
-        wsDash.Cells(zeileSchwelle1, c).ClearContents
-        wsDash.Cells(zeileSchwelle2, c).ClearContents
-        wsDash.Cells(zeileBezuege, c).Value = blattName
-
-        ' --------------------------------------------------------
-        ' SCHWELLENWERTE
-        ' D1 = Schwelle 1
-        ' E1 = Schwelle 2
-        '
-        ' Zahl / numerischer Text und Boolean / Boolean-Text
-        ' werden erkannt. Boolean wird im Dashboard als 1/0
-        ' dargestellt.
-        ' --------------------------------------------------------
-
-        schwelle1 = Empty
-        schwelle2 = Empty
-
-        hatSchwelle1 = _
-            VaultsWertFuerDashboard( _
-                wsQuelle.Cells(1, 4).Value, _
-                dashboardWert) > 0
-
-        If hatSchwelle1 Then
-
-            schwelle1 = wsQuelle.Cells(1, 4).Value
-
-            wsDash.Cells( _
-                zeileSchwelle1, _
-                c).Value = dashboardWert
-
-        End If
-
-        hatSchwelle2 = _
-            VaultsWertFuerDashboard( _
-                wsQuelle.Cells(1, 5).Value, _
-                dashboardWert) > 0
-
-        If hatSchwelle2 Then
-
-            schwelle2 = wsQuelle.Cells(1, 5).Value
-
-            wsDash.Cells( _
-                zeileSchwelle2, _
-                c).Value = dashboardWert
-
-        End If
-
-        ' Der definierte Name für die Daten-Spalte wird immer
-        ' ausdrücklich erstellt bzw. auf diese Spalte korrigiert.
-        nameText = "Vaults_" & blattName
-
-        VaultsNameSicherstellen _
-            wsDash, _
-            c, _
-            zeileSummen, _
-            nameText
-
-        Set spielerWerte = New Collection
-
-        letzteZeileQuelle = wsQuelle.Cells( _
-            wsQuelle.Rows.Count, _
-            3).End(xlUp).Row
-
-        If letzteZeileQuelle >= 3 Then
-
-            For i = 3 To letzteZeileQuelle
-
-                spieler = SichererText( _
-                    wsQuelle.Cells(i, 3).Value)
-
-                If Len(spieler) > 0 Then
-
-                    key = SpielerKey(spieler)
-
-                    If CollectionKeyExistiert( _
-                            spielerWerte, _
-                            key) Then
-
-                        LogEintrag _
-                            wsLog, _
-                            "DUPLIKAT VAULTS", _
-                            spieler, _
-                            "Spieler kommt mehrfach im Quellblatt '" & _
-                            blattName & _
-                            "' vor. Der erste Wert wird verwendet."
-
-                    Else
-
-                        spielerWerte.Add _
-                            wsQuelle.Cells(i, 5).Value, _
-                            key
-
-                    End If
-
-                End If
-
-            Next i
-
-        End If
-
-        anzahlAktiveUnterSchwelle = 0
-
-        For i = zeileSpieler1 To letzteZeileDash
-
-            spieler = SichererText( _
-                wsDash.Cells(i, cSpieler).Value)
-
-            If Len(spieler) > 0 Then
-
-                key = SpielerKey(spieler)
-
-                wertGefunden = CollectionKeyExistiert( _
-                    spielerWerte, _
-                    key)
-
-                If wertGefunden Then
-
-                    wert = CollectionWert( _
-                        spielerWerte, _
-                        key)
-
-                    ' ------------------------------------------------
-                    ' DASHBOARD-WERT
-                    ' Boolean -> 1 / 0
-                    ' Zahlen und numerischer Text -> Zahl
-                    ' Ungültig / leer -> leer
-                    ' ------------------------------------------------
-
-                    If VaultsWertFuerDashboard( _
-                            wert, _
-                            dashboardWert) > 0 Then
-
-                        wsDash.Cells(i, c).Value = dashboardWert
-
-                    Else
-
-                        wsDash.Cells(i, c).ClearContents
-
-                    End If
-
-                    pruefen = False
-                    schwelleVerwenden = Empty
-
-                    ' ------------------------------------------------
-                    ' SCHWELLENLOGIK
-                    ' 1. D1 und E1 vorhanden:
-                    '    T9=1 -> D1, sonst -> E1
-                    '
-                    ' 2. nur E1 vorhanden:
-                    '    E1 für alle
-                    '
-                    ' 3. nur D1 vorhanden:
-                    '    D1 nur für T9=1
-                    '
-                    ' 4. beide leer/ungültig:
-                    '    keine Prüfung
-                    ' ------------------------------------------------
-
-                    If hatSchwelle1 And hatSchwelle2 Then
-
-                        If IstEins( _
-                                wsDash.Cells(i, cT9).Value) Then
-
-                            schwelleVerwenden = schwelle1
-
-                        Else
-
-                            schwelleVerwenden = schwelle2
-
-                        End If
-
-                        pruefen = True
-
-                    ElseIf (Not hatSchwelle1) And hatSchwelle2 Then
-
-                        schwelleVerwenden = schwelle2
-                        pruefen = True
-
-                    ElseIf hatSchwelle1 And (Not hatSchwelle2) Then
-
-                        If IstEins( _
-                                wsDash.Cells(i, cT9).Value) Then
-
-                            schwelleVerwenden = schwelle1
-                            pruefen = True
-
-                        End If
-
-                    End If
-
-                    If pruefen Then
-
-                        If VaultsWertUnterSchwelle( _
-                                wert, _
-                                schwelleVerwenden, _
-                                istBewertbar) Then
-
-                            If IstAktiv( _
-                                    wsDash.Cells( _
-                                        i, _
-                                        cBasisdaten).Value) Then
-
-                                anzahlAktiveUnterSchwelle = _
-                                    anzahlAktiveUnterSchwelle + 1
-
-                            End If
-
-                            wsDash.Cells( _
-                                i, _
-                                c).Font.Color = _
-                                RGB(255, 0, 0)
-
-                            wsDash.Cells( _
-                                i, _
-                                cNOK).Value = _
-                                CLng(Val(wsDash.Cells(i, cNOK).Value)) + 1
-
-                        ElseIf istBewertbar Then
-
-                            wsDash.Cells( _
-                                i, _
-                                c).Font.ColorIndex = _
-                                xlAutomatic
-
-                        Else
-
-                            ' Unterschiedliche Werttypen, leer oder
-                            ' ungültig: keine Bewertung.
-                            wsDash.Cells( _
-                                i, _
-                                c).Font.ColorIndex = _
-                                xlAutomatic
-
-                        End If
-
-                    Else
-
-                        wsDash.Cells( _
-                            i, _
-                            c).Font.ColorIndex = _
-                            xlAutomatic
-
-                    End If
-
-                Else
-
-                    wsDash.Cells(i, c).ClearContents
-
-                    wsDash.Cells(i, c).Font.ColorIndex = _
-                        xlAutomatic
-
-                End If
-
-            End If
-
-        Next i
-
-        wsDash.Cells(1, c).Value = _
-            anzahlAktiveUnterSchwelle
-
-    Next blattIndex
-
-Aufraeumen:
-
-    If Not wbVaults Is Nothing Then
-
-        If Not warBereitsOffen Then
-
-            On Error Resume Next
-
-            wbVaults.Close SaveChanges:=False
-
-            On Error GoTo 0
-
-        End If
-
-    End If
-
-    Exit Sub
-
-OeffnenFehler:
-
-    LogEintrag _
-        wsLog, _
-        "VAULTS WARNUNG", _
-        "", _
-        "Die Datei '" & _
-        VAULTS_DATEI & _
-        "' konnte nicht geöffnet werden. Fehler " & _
-        CStr(Err.Number) & _
-        ": " & _
-        Err.Description
-
-    Resume Aufraeumen
-
-End Sub
 
 ' ============================================================
 ' VAULTS NOK NAME SICHERSTELLEN
 ' ============================================================
 
-Private Sub VaultsNOKNameSicherstellen( _
-    ByVal wsDash As Worksheet, _
-    ByVal cNOK As Long, _
-    ByVal zeileBezuege As Long)
 
-    Dim nm As name
-    Dim rngZiel As Range
-    Dim zielBezug As String
-
-    ' Der Vaults_NOK-Marker bezeichnet die komplette Excel-Spalte.
-    ' Beispiel: Spalte AT -> $AT:$AT.
-    Set rngZiel = wsDash.Columns(cNOK)
-
-    zielBezug = "=" & _
-        wsDash.Name & "!" & _
-        rngZiel.Address( _
-            RowAbsolute:=True, _
-            ColumnAbsolute:=True, _
-            ReferenceStyle:=xlA1)
-
-    Set nm = Nothing
-
-    On Error Resume Next
-    Set nm = ThisWorkbook.Names("Vaults_NOK")
-    On Error GoTo 0
-
-    If nm Is Nothing Then
-
-        Set nm = ThisWorkbook.Names.Add( _
-            Name:="Vaults_NOK", _
-            RefersTo:=zielBezug, _
-            Visible:=True)
-
-    Else
-
-        nm.Visible = True
-        nm.RefersTo = zielBezug
-
-    End If
-
-End Sub
 
 ' ============================================================
 ' VAULTS NAME SICHERSTELLEN
 ' ============================================================
 
-Private Sub VaultsNameSicherstellen( _
-    ByVal wsDash As Worksheet, _
-    ByVal c As Long, _
-    ByVal zeileSummen As Long, _
-    ByVal nameText As String)
 
-    Dim nm As name
-    Dim rngZiel As Range
-    Dim zielBezug As String
-
-    ' Der Name der Vaults-Datenspalte umfasst die komplette
-    ' Excel-Spalte. Dadurch wird z. B. aus Spalte AT
-    ' tatsächlich der Bereich $AT:$AT.
-    Set rngZiel = wsDash.Columns(c)
-
-    zielBezug = "=" & _
-        wsDash.Name & "!" & _
-        rngZiel.Address( _
-            RowAbsolute:=True, _
-            ColumnAbsolute:=True, _
-            ReferenceStyle:=xlA1)
-
-    Set nm = Nothing
-
-    On Error Resume Next
-
-    Set nm = ThisWorkbook.Names(nameText)
-
-    On Error GoTo 0
-
-    If nm Is Nothing Then
-
-        Set nm = ThisWorkbook.Names.Add( _
-            Name:=nameText, _
-            RefersTo:=zielBezug, _
-            Visible:=True)
-
-    Else
-
-        nm.Visible = True
-        nm.RefersTo = zielBezug
-
-    End If
-
-End Sub
 
 
 Private Sub DashboardSortieren( _
