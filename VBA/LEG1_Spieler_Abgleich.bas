@@ -2638,19 +2638,15 @@ Private Sub TB_BereichsformatierungSetzen( _
 
                 ' ------------------------------------------------
                 ' _NOK-MARKER
-                ' Gleiche Spaltenbreite wie die letzte
-                ' Datenspalte links davon.
+                ' Die Breite entspricht immer der Breite des
+                ' unmittelbar davorliegenden _NOK-Markers.
                 ' ------------------------------------------------
 
-                ' Die Breite des _NOK-Markers entspricht immer
-                ' exakt der Breite des letzten _NOK-Markers.
-                ' Damit bleiben alle _NOK-Spalten innerhalb des
-                ' dynamischen Bereichsschemas gleich breit.
                 ws.Columns(cNOK).Hidden = False
 
-                If cNOK > 1 Then
+                If c > 1 Then
                     ws.Columns(cNOK).ColumnWidth = _
-                        ws.Columns(cNOK - 1).ColumnWidth
+                        ws.Columns(markerSpalten(c - 1)).ColumnWidth
                 End If
 
                 ' ------------------------------------------------
@@ -2742,14 +2738,33 @@ Private Sub BereichsDatenspaltenGruppieren( _
 
     Next i
 
-    ' Nach dem Gruppieren alle Bereichs-Datenspalten wieder
-    ' auf der Detailstufe anzeigen. Die Gruppierung bleibt
-    ' erhalten und kann weiterhin über das Outline ein-/ausgeblendet
-    ' werden. Dadurch werden bestehende Bereiche wie Carter, Vaults
-    ' und Chests nicht versehentlich dauerhaft ausgeblendet.
-    On Error Resume Next
-    ws.Outline.ShowLevels ColumnLevels:=2
-    On Error GoTo 0
+    ' Die Datenspalten der Bereiche bleiben nach dem Gruppieren
+    ' ausgeblendet. Die _NOK-Marker bleiben dagegen immer sichtbar.
+    ' Dadurch ist der Bereich über die _NOK-Spalte sichtbar, während
+    ' die Detaildaten über die Gruppierung eingeblendet werden können.
+    For i = 1 To markerAnzahl
+
+        cStart = 0
+        cEnde = -1
+
+        If BereichsGrenzenFuerNOKMarkerErmitteln( _
+                ws, _
+                cBasisdaten, _
+                markerSpalten(i), _
+                cStart, _
+                cEnde) Then
+
+            If cStart <= cEnde Then
+                ws.Range( _
+                    ws.Columns(cStart), _
+                    ws.Columns(cEnde)).EntireColumn.Hidden = True
+            End If
+
+        End If
+
+        ws.Columns(markerSpalten(i)).Hidden = False
+
+    Next i
 
 End Sub
 
