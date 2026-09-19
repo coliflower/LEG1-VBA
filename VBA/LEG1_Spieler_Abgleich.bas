@@ -2656,7 +2656,7 @@ Private Sub TB_BereichsformatierungSetzen( _
 
                 With ws.Cells(zeileBezuege, cNOK)
 
-                    .Orientation = xlHorizontal
+                    .Orientation = xlUpward
                     .HorizontalAlignment = xlCenter
                     .VerticalAlignment = xlBottom
                     .Font.Color = RGB(255, 0, 0)
