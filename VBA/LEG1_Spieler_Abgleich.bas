@@ -3529,6 +3529,7 @@ Private Sub VaultsBereichPruefen( _
     Dim anzahlBlaetter As Long
     Dim blattName As String
     Dim nameText As String
+    Dim bereichsName As String
 
     Dim schwelle1 As Variant
     Dim schwelle2 As Variant
@@ -3582,6 +3583,16 @@ Private Sub VaultsBereichPruefen( _
 
     If wbVaults Is Nothing Then Exit Sub
 
+    bereichsName = VAULTS_DATEI
+
+    If Left$(bereichsName, 4) = "TB__" Then
+        bereichsName = Mid$(bereichsName, 5)
+    End If
+
+    If LCase$(Right$(bereichsName, 5)) = ".xlsx" Then
+        bereichsName = Left$(bereichsName, Len(bereichsName) - 5)
+    End If
+
     On Error Resume Next
 
     cNOK = DashboardSpalte( _
@@ -3626,6 +3637,8 @@ Private Sub VaultsBereichPruefen( _
         wsDash, _
         cNOK, _
         zeileBezuege
+
+    wsDash.Cells(zeileBezuege, cNOK).Value = bereichsName
 
     wsDash.Range( _
         wsDash.Cells(zeileSpieler1, cNOK), _
