@@ -2643,10 +2643,15 @@ Private Sub TB_BereichsformatierungSetzen( _
                 ' ------------------------------------------------
 
                 ' Die Breite des _NOK-Markers entspricht immer
-                ' exakt der letzten Datenspalte des Bereichs.
+                ' exakt der Breite des letzten _NOK-Markers.
+                ' Damit bleiben alle _NOK-Spalten innerhalb des
+                ' dynamischen Bereichsschemas gleich breit.
                 ws.Columns(cNOK).Hidden = False
-                ws.Columns(cNOK).ColumnWidth = _
-                    ws.Columns(cEnde).ColumnWidth
+
+                If cNOK > 1 Then
+                    ws.Columns(cNOK).ColumnWidth = _
+                        ws.Columns(cNOK - 1).ColumnWidth
+                End If
 
                 ' ------------------------------------------------
                 ' BEZUG DES _NOK-MARKERS
