@@ -2582,7 +2582,8 @@ Private Sub TB_BereichsformatierungSetzen( _
     ByVal zeileSchwelle2 As Long, _
     ByVal zeileBezuege As Long)
 
-    Dim nokMarker As Collection
+    Dim markerSpalten() As Long
+    Dim markerAnzahl As Long
     Dim cNOK As Long
     Dim cStart As Long
     Dim cEnde As Long
@@ -2593,14 +2594,15 @@ Private Sub TB_BereichsformatierungSetzen( _
     If zeileSchwelle2 <= 0 Then Exit Sub
     If zeileBezuege <= 0 Then Exit Sub
 
-    Set nokMarker = NOKMarkerSpaltenErmitteln(ws)
+    markerAnzahl = NOKMarkerSpaltenErmitteln( _
+        ws, _
+        markerSpalten)
 
-    If nokMarker Is Nothing Then Exit Sub
-    If nokMarker.Count = 0 Then Exit Sub
+    If markerAnzahl <= 0 Then Exit Sub
 
-    For c = 1 To nokMarker.Count
+    For c = 1 To markerAnzahl
 
-        cNOK = CLng(nokMarker(c))
+        cNOK = markerSpalten(c)
 
         If BereichsGrenzenFuerNOKMarkerErmitteln( _
                 ws, _
