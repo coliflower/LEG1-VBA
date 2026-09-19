@@ -650,6 +650,12 @@ NaechsterUpdateSpielerNeu:
 
     cLetzterNOK = LetzterNOKMarker(wsDash)
 
+    schritt = "Datenspalten der Bereiche gruppieren"
+
+    BereichsDatenspaltenGruppieren _
+        wsDash, _
+        cBasisdaten
+
     schritt = "Endgültige Schriftfarben setzen"
 
     EndgueltigeSchriftfarbenSetzen _
@@ -1373,6 +1379,79 @@ Private Sub DashboardStrukturPruefen( _
         End If
 
     Next namePruefen
+
+End Sub
+
+' ============================================================
+' DATENSPALTEN DER DYNAMISCHEN BEREICHE GRUPPIEREN
+' ============================================================
+
+Private Sub BereichsDatenspaltenGruppieren( _
+    ByVal ws As Worksheet, _
+    ByVal cBasisdaten As Long)
+
+    Dim markerSpalten() As Long
+    Dim markerAnzahl As Long
+    Dim i As Long
+
+    Dim cStart As Long
+    Dim cEnde As Long
+    Dim c As Long
+    Dim bereitsGruppiert As Boolean
+
+    If ws Is Nothing Then Exit Sub
+    If cBasisdaten <= 0 Then Exit Sub
+
+    markerAnzahl = NOKMarkerSpaltenErmitteln( _
+        ws, _
+        markerSpalten)
+
+    If markerAnzahl <= 0 Then Exit Sub
+
+    For i = 1 To markerAnzahl
+
+        cStart = 0
+        cEnde = -1
+
+        If BereichsGrenzenFuerNOKMarkerErmitteln( _
+                ws, _
+                cBasisdaten, _
+                markerSpalten(i), _
+                cStart, _
+                cEnde) Then
+
+            If cStart <= cEnde Then
+
+                bereitsGruppiert = True
+
+                For c = cStart To cEnde
+
+                    If ws.Columns(c).OutlineLevel <= 1 Then
+
+                        bereitsGruppiert = False
+                        Exit For
+
+                    End If
+
+                Next c
+
+                If Not bereitsGruppiert Then
+
+                    On Error Resume Next
+
+                    ws.Range( _
+                        ws.Columns(cStart), _
+                        ws.Columns(cEnde)).Group
+
+                    On Error GoTo 0
+
+                End If
+
+            End If
+
+        End If
+
+    Next i
 
 End Sub
 
