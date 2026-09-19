@@ -648,6 +648,21 @@ NaechsterUpdateSpielerNeu:
         letzteZeileDash, _
         wsLog
 
+    schritt = "Neue TB__Bereiche automatisch erkennen"
+
+    NeueTBBereicheAutomatischAnlegen _
+        wsDash, _
+        cBasisdaten, _
+        zeileSummen, _
+        zeileSchwelle1, _
+        zeileSchwelle2, _
+        zeileBezuege, _
+        cSpieler, _
+        cT9, _
+        zeileSpieler1, _
+        letzteZeileDash, _
+        wsLog
+
     cLetzterNOK = LetzterNOKMarker(wsDash)
 
     schritt = "Datenspalten der Bereiche gruppieren"
@@ -1379,6 +1394,767 @@ Private Sub DashboardStrukturPruefen( _
         End If
 
     Next namePruefen
+
+End Sub
+
+' ============================================================
+' NEUE TB__-BEREICHE AUTOMATISCH ERKENNEN UND ANLEGEN
+' ============================================================
+
+Private Sub NeueTBBereicheAutomatischAnlegen( _
+    ByVal wsDash As Worksheet, _
+    ByVal cBasisdaten As Long, _
+    ByVal zeileSummen As Long, _
+    ByVal zeileSchwelle1 As Long, _
+    ByVal zeileSchwelle2 As Long, _
+    ByVal zeileBezuege As Long, _
+    ByVal cSpieler As Long, _
+    ByVal cT9 As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal letzteZeileDash As Long, _
+    ByVal wsLog As Worksheet)
+
+    Dim dateiname As String
+    Dim dateipfad As String
+    Dim bereichsName As String
+    Dim excelBereichsName As String
+    Dim nokName As String
+
+    Dim wbQuelle As Workbook
+    Dim wsQuelle As Worksheet
+
+    Dim cLetzterNOK As Long
+    Dim cStart As Long
+    Dim cNOK As Long
+    Dim c As Long
+    Dim i As Long
+    Dim blattIndex As Long
+    Dim anzahlBlaetter As Long
+
+    Dim warBereitsOffen As Boolean
+    Dim spielerWerte As Collection
+
+    Dim spieler As String
+    Dim key As String
+    Dim wert As Variant
+    Dim dashboardWert As Variant
+    Dim schwelle1 As Variant
+    Dim schwelle2 As Variant
+    Dim schwelleVerwenden As Variant
+
+    Dim hatSchwelle1 As Boolean
+    Dim hatSchwelle2 As Boolean
+    Dim pruefen As Boolean
+    Dim istBewertbar As Boolean
+    Dim wertGefunden As Boolean
+
+    Dim anzahlAktiveUnterSchwelle As Long
+    Dim letzteZeileQuelle As Long
+
+    Dim sheetName As String
+    Dim datenName As String
+
+    Dim namePruefen As String
+    Dim namenKollision As Boolean
+
+    If wsDash Is Nothing Then Exit Sub
+    If cBasisdaten <= 0 Then Exit Sub
+    If zeileSummen <= 0 Then Exit Sub
+    If zeileSchwelle1 <= 0 Then Exit Sub
+    If zeileSchwelle2 <= 0 Then Exit Sub
+    If zeileBezuege <= 0 Then Exit Sub
+    If cSpieler <= 0 Then Exit Sub
+    If cT9 <= 0 Then Exit Sub
+    If zeileSpieler1 <= 0 Then Exit Sub
+    If letzteZeileDash < zeileSpieler1 Then Exit Sub
+
+    If Len(ThisWorkbook.Path) = 0 Then
+
+        LogEintrag _
+            wsLog, _
+            "TB__ WARNUNG", _
+            "", _
+            "Die LEG1-Arbeitsmappe wurde noch nicht gespeichert. " & _
+            "Der Ordner für automatische TB__Bereiche konnte nicht ermittelt werden."
+
+        Exit Sub
+
+    End If
+
+    ' Alle TB__*.xlsx-Dateien im Verzeichnis der LEG1-Arbeitsmappe
+    ' werden geprüft. Chests und Vaults besitzen bereits eigene
+    ' spezialisierte Prüfungen und werden deshalb hier übersprungen.
+    On Error GoTo ScanFehler
+
+    dateiname = Dir( _
+        ThisWorkbook.Path & _
+        Application.PathSeparator & _
+        "TB__*.xlsx")
+
+    Do While Len(dateiname) > 0
+
+        If StrComp( _
+                dateiname, _
+                CHESTS_DATEI, _
+                vbTextCompare) <> 0 And _
+           StrComp( _
+                dateiname, _
+                VAULTS_DATEI, _
+                vbTextCompare) <> 0 Then
+
+            bereichsName = dateiname
+
+            If Left$(bereichsName, 4) = "TB__" Then
+                bereichsName = Mid$(bereichsName, 5)
+            End If
+
+            If LCase$(Right$(bereichsName, 5)) = ".xlsx" Then
+                bereichsName = Left$( _
+                    bereichsName, _
+                    Len(bereichsName) - 5)
+            End If
+
+            bereichsName = Trim$(bereichsName)
+            excelBereichsName = ExcelNameBereinigen(bereichsName)
+
+            If Len(bereichsName) = 0 Or _
+               Len(excelBereichsName) = 0 Then
+
+                LogEintrag _
+                    wsLog, _
+                    "TB__ WARNUNG", _
+                    "", _
+                    "Datei '" & _
+                    dateiname & _
+                    "' hat keinen gültigen Bereichsnamen."
+
+            Else
+
+                nokName = excelBereichsName & "_NOK"
+
+                ' Bereits vorhandene Bereiche werden bewusst nicht
+                ' neu angelegt. Dadurch bleiben bestehende Spezial-
+                ' bereiche und bereits manuell eingerichtete Bereiche
+                ' unangetastet.
+                If DashboardSpalte(wsDash, nokName) > 0 Then
+
+                    LogEintrag _
+                        wsLog, _
+                        "TB__ BEREICH VORHANDEN", _
+                        "", _
+                        "Bereich '" & _
+                        bereichsName & _
+                        "' wurde erkannt, aber nicht neu angelegt. " & _
+                        "Der _NOK-Marker '" & _
+                        nokName & _
+                        "' existiert bereits."
+
+                Else
+
+                    dateipfad = _
+                        ThisWorkbook.Path & _
+                        Application.PathSeparator & _
+                        dateiname
+
+                    Set wbQuelle = Nothing
+                    warBereitsOffen = False
+
+                    On Error Resume Next
+
+                    Set wbQuelle = Workbooks(dateiname)
+
+                    On Error GoTo ScanFehler
+
+                    If wbQuelle Is Nothing Then
+
+                        On Error GoTo DateiOeffnenFehler
+
+                        Set wbQuelle = Workbooks.Open( _
+                            FileName:=dateipfad, _
+                            UpdateLinks:=0, _
+                            ReadOnly:=True, _
+                            IgnoreReadOnlyRecommended:=True)
+
+                        On Error GoTo ScanFehler
+
+                    Else
+
+                        warBereitsOffen = True
+
+                    End If
+
+                    If wbQuelle Is Nothing Then GoTo NaechsteTBDatei
+
+                    anzahlBlaetter = wbQuelle.Worksheets.Count
+
+                    If anzahlBlaetter <= 0 Then
+
+                        LogEintrag _
+                            wsLog, _
+                            "TB__ WARNUNG", _
+                            "", _
+                            "Die Datei '" & _
+                            dateiname & _
+                            "' enthält keine Arbeitsblätter."
+
+                        GoTo TBQuelleSchliessen
+
+                    End If
+
+                    ' Der Bereich wird erst nach erfolgreichem Öffnen
+                    ' der Quelldatei und erfolgreicher Ermittlung der
+                    ' Blattanzahl im Dashboard angelegt.
+                    cLetzterNOK = LetzterNOKMarker(wsDash)
+
+                    If cLetzterNOK <= 0 Then
+
+                        LogEintrag _
+                            wsLog, _
+                            "TB__ WARNUNG", _
+                            "", _
+                            "Für den neuen Bereich '" & _
+                            bereichsName & _
+                            "' wurde kein vorhandener _NOK-Endmarker " & _
+                            "als Vorgänger gefunden."
+
+                        GoTo TBQuelleSchliessen
+
+                    End If
+
+                    cStart = cLetzterNOK + 1
+                    cNOK = cStart + anzahlBlaetter
+
+                    BereichNOKNameSicherstellen _
+                        wsDash, _
+                        cNOK, _
+                        nokName
+
+                    wsDash.Cells( _
+                        zeileBezuege, _
+                        cNOK).Value = bereichsName
+
+                    wsDash.Range( _
+                        wsDash.Cells(zeileSpieler1, cNOK), _
+                        wsDash.Cells(letzteZeileDash, cNOK)).Value = 0
+
+                    For blattIndex = 1 To anzahlBlaetter
+
+                        Set wsQuelle = _
+                            wbQuelle.Worksheets(blattIndex)
+
+                        c = cStart + blattIndex - 1
+
+                        sheetName = _
+                            SichererText(wsQuelle.Name)
+
+                        wsDash.Cells(1, c).Value = 0
+                        wsDash.Cells(zeileSchwelle1, c).ClearContents
+                        wsDash.Cells(zeileSchwelle2, c).ClearContents
+                        wsDash.Cells(zeileBezuege, c).Value = sheetName
+
+                        BereichDatenNameSicherstellen _
+                            wsDash, _
+                            c, _
+                            ExcelNameBereinigen( _
+                                excelBereichsName & _
+                                "_" & _
+                                sheetName)
+
+                        schwelle1 = Empty
+                        schwelle2 = Empty
+                        dashboardWert = Empty
+
+                        hatSchwelle1 = _
+                            VaultsWertFuerDashboard( _
+                                wsQuelle.Cells(1, 4).Value, _
+                                dashboardWert) > 0
+
+                        If hatSchwelle1 Then
+
+                            schwelle1 = _
+                                wsQuelle.Cells(1, 4).Value
+
+                            wsDash.Cells( _
+                                zeileSchwelle1, _
+                                c).Value = dashboardWert
+
+                        End If
+
+                        dashboardWert = Empty
+
+                        hatSchwelle2 = _
+                            VaultsWertFuerDashboard( _
+                                wsQuelle.Cells(1, 5).Value, _
+                                dashboardWert) > 0
+
+                        If hatSchwelle2 Then
+
+                            schwelle2 = _
+                                wsQuelle.Cells(1, 5).Value
+
+                            wsDash.Cells( _
+                                zeileSchwelle2, _
+                                c).Value = dashboardWert
+
+                        End If
+
+                        Set spielerWerte = New Collection
+
+                        letzteZeileQuelle = _
+                            wsQuelle.Cells( _
+                                wsQuelle.Rows.Count, _
+                                3).End(xlUp).Row
+
+                        If letzteZeileQuelle >= 3 Then
+
+                            For i = 3 To letzteZeileQuelle
+
+                                spieler = SichererText( _
+                                    wsQuelle.Cells(i, 3).Value)
+
+                                If Len(spieler) > 0 Then
+
+                                    key = SpielerKey(spieler)
+
+                                    If CollectionKeyExistiert( _
+                                            spielerWerte, _
+                                            key) Then
+
+                                        LogEintrag _
+                                            wsLog, _
+                                            "DUPLIKAT TB__", _
+                                            spieler, _
+                                            "Spieler kommt mehrfach im Quellblatt '" & _
+                                            sheetName & _
+                                            "' der Datei '" & _
+                                            dateiname & _
+                                            "' vor. Der erste Wert wird verwendet."
+
+                                    Else
+
+                                        spielerWerte.Add _
+                                            wsQuelle.Cells(i, 5).Value, _
+                                            key
+
+                                    End If
+
+                                End If
+
+                            Next i
+
+                        End If
+
+                        anzahlAktiveUnterSchwelle = 0
+
+                        For i = zeileSpieler1 To letzteZeileDash
+
+                            spieler = SichererText( _
+                                wsDash.Cells(i, cSpieler).Value)
+
+                            If Len(spieler) > 0 Then
+
+                                key = SpielerKey(spieler)
+
+                                wertGefunden = _
+                                    CollectionKeyExistiert( _
+                                        spielerWerte, _
+                                        key)
+
+                                If wertGefunden Then
+
+                                    wert = _
+                                        CollectionWert( _
+                                            spielerWerte, _
+                                            key)
+
+                                    dashboardWert = Empty
+
+                                    If VaultsWertFuerDashboard( _
+                                            wert, _
+                                            dashboardWert) > 0 Then
+
+                                        wsDash.Cells(i, c).Value = _
+                                            dashboardWert
+
+                                    Else
+
+                                        wsDash.Cells(i, c).ClearContents
+
+                                    End If
+
+                                    pruefen = False
+                                    schwelleVerwenden = Empty
+
+                                    If hatSchwelle1 And _
+                                       hatSchwelle2 Then
+
+                                        If IstEins( _
+                                                wsDash.Cells( _
+                                                    i, _
+                                                    cT9).Value) Then
+
+                                            schwelleVerwenden = schwelle1
+
+                                        Else
+
+                                            schwelleVerwenden = schwelle2
+
+                                        End If
+
+                                        pruefen = True
+
+                                    ElseIf (Not hatSchwelle1) And _
+                                           hatSchwelle2 Then
+
+                                        schwelleVerwenden = schwelle2
+                                        pruefen = True
+
+                                    ElseIf hatSchwelle1 And _
+                                           (Not hatSchwelle2) Then
+
+                                        If IstEins( _
+                                                wsDash.Cells( _
+                                                    i, _
+                                                    cT9).Value) Then
+
+                                            schwelleVerwenden = schwelle1
+                                            pruefen = True
+
+                                        End If
+
+                                    End If
+
+                                    If pruefen Then
+
+                                        If VaultsWertUnterSchwelle( _
+                                                wert, _
+                                                schwelleVerwenden, _
+                                                istBewertbar) Then
+
+                                            If IstAktiv( _
+                                                    wsDash.Cells( _
+                                                        i, _
+                                                        cBasisdaten).Value) Then
+
+                                                anzahlAktiveUnterSchwelle = _
+                                                    anzahlAktiveUnterSchwelle + 1
+
+                                            End If
+
+                                            wsDash.Cells(i, c).Font.Color = _
+                                                RGB(255, 0, 0)
+
+                                            wsDash.Cells( _
+                                                i, _
+                                                cNOK).Value = _
+                                                CLng( _
+                                                    Val( _
+                                                        wsDash.Cells( _
+                                                            i, _
+                                                            cNOK).Value)) + 1
+
+                                        ElseIf istBewertbar Then
+
+                                            wsDash.Cells(i, c).Font.ColorIndex = _
+                                                xlAutomatic
+
+                                        Else
+
+                                            wsDash.Cells(i, c).Font.ColorIndex = _
+                                                xlAutomatic
+
+                                        End If
+
+                                    Else
+
+                                        wsDash.Cells(i, c).Font.ColorIndex = _
+                                            xlAutomatic
+
+                                    End If
+
+                                Else
+
+                                    wsDash.Cells(i, c).ClearContents
+
+                                    wsDash.Cells(i, c).Font.ColorIndex = _
+                                        xlAutomatic
+
+                                End If
+
+                            End If
+
+                        Next i
+
+                        wsDash.Cells(1, c).Value = _
+                            anzahlAktiveUnterSchwelle
+
+                    Next blattIndex
+
+                    LogEintrag _
+                        wsLog, _
+                        "TB__ BEREICH ANGELEGT", _
+                        "", _
+                        "Bereich '" & _
+                        bereichsName & _
+                        "' wurde automatisch aus '" & _
+                        dateiname & _
+                        "' angelegt. Datenspalten: " & _
+                        CStr(anzahlBlaetter) & _
+                        ", _NOK-Marker: " & _
+                        nokName
+
+TBQuelleSchliessen:
+
+                    If Not wbQuelle Is Nothing Then
+
+                        If Not warBereitsOffen Then
+
+                            On Error Resume Next
+
+                            wbQuelle.Close SaveChanges:=False
+
+                            On Error GoTo ScanFehler
+
+                        End If
+
+                    End If
+
+                    Set wbQuelle = Nothing
+
+                End If
+
+            End If
+
+        End If
+
+NaechsteTBDatei:
+
+        dateiname = Dir()
+
+    Loop
+
+    Exit Sub
+
+DateiOeffnenFehler:
+
+    LogEintrag _
+        wsLog, _
+        "TB__ WARNUNG", _
+        "", _
+        "Die Datei '" & _
+        dateiname & _
+        "' konnte nicht geöffnet werden. Fehler " & _
+        CStr(Err.Number) & _
+        ": " & _
+        Err.Description
+
+    On Error Resume Next
+
+    If Not wbQuelle Is Nothing Then
+
+        If Not warBereitsOffen Then
+            wbQuelle.Close SaveChanges:=False
+        End If
+
+    End If
+
+    Set wbQuelle = Nothing
+
+    On Error GoTo ScanFehler
+
+    Resume NaechsteTBDatei
+
+ScanFehler:
+
+    LogEintrag _
+        wsLog, _
+        "TB__ WARNUNG", _
+        "", _
+        "Fehler bei der automatischen TB__Bereichserkennung. " & _
+        "Datei: '" & _
+        dateiname & _
+        "'. Fehler " & _
+        CStr(Err.Number) & _
+        ": " & _
+        Err.Description
+
+    On Error Resume Next
+
+    If Not wbQuelle Is Nothing Then
+
+        If Not warBereitsOffen Then
+            wbQuelle.Close SaveChanges:=False
+        End If
+
+    End If
+
+    On Error GoTo 0
+
+End Sub
+
+' ============================================================
+' EXCEL-NAMEN AUS BEREICHS-/BLATTNAMEN ERZEUGEN
+' ============================================================
+
+Private Function ExcelNameBereinigen( _
+    ByVal text As String) As String
+
+    Dim i As Long
+    Dim ch As String
+    Dim ergebnis As String
+
+    text = Trim$(text)
+
+    For i = 1 To Len(text)
+
+        ch = Mid$(text, i, 1)
+
+        If ch Like "[A-Za-z0-9_]" Then
+
+            ergebnis = ergebnis & ch
+
+        Else
+
+            ergebnis = ergebnis & "_"
+
+        End If
+
+    Next i
+
+    Do While InStr(1, ergebnis, "__", vbBinaryCompare) > 0
+
+        ergebnis = Replace( _
+            ergebnis, _
+            "__", _
+            "_", _
+            1, _
+            -1, _
+            vbBinaryCompare)
+
+    Loop
+
+    If Len(ergebnis) = 0 Then
+
+        ergebnis = "_Bereich"
+
+    End If
+
+    If Mid$(ergebnis, 1, 1) Like "[0-9]" Then
+
+        ergebnis = "_" & ergebnis
+
+    End If
+
+    If UCase$(ergebnis) = "R" Or _
+       UCase$(ergebnis) = "C" Then
+
+        ergebnis = "_" & ergebnis
+
+    End If
+
+    If Len(ergebnis) > 200 Then
+
+        ergebnis = Left$(ergebnis, 200)
+
+    End If
+
+    ExcelNameBereinigen = ergebnis
+
+End Function
+
+' ============================================================
+' GENERISCHEN _NOK-NAMEN SICHERSTELLEN
+' ============================================================
+
+Private Sub BereichNOKNameSicherstellen( _
+    ByVal wsDash As Worksheet, _
+    ByVal cNOK As Long, _
+    ByVal nameText As String)
+
+    Dim nm As name
+    Dim rngZiel As Range
+    Dim zielBezug As String
+
+    If wsDash Is Nothing Then Exit Sub
+    If cNOK <= 0 Then Exit Sub
+    If Len(nameText) = 0 Then Exit Sub
+
+    Set rngZiel = wsDash.Columns(cNOK)
+
+    zielBezug = "=" & _
+        wsDash.Name & "!" & _
+        rngZiel.Address( _
+            RowAbsolute:=True, _
+            ColumnAbsolute:=True, _
+            ReferenceStyle:=xlA1)
+
+    Set nm = Nothing
+
+    On Error Resume Next
+    Set nm = ThisWorkbook.Names(nameText)
+    On Error GoTo 0
+
+    If nm Is Nothing Then
+
+        Set nm = ThisWorkbook.Names.Add( _
+            Name:=nameText, _
+            RefersTo:=zielBezug, _
+            Visible:=True)
+
+    Else
+
+        nm.Visible = True
+        nm.RefersTo = zielBezug
+
+    End If
+
+End Sub
+
+' ============================================================
+' GENERISCHEN DATENSPALTEN-NAMEN SICHERSTELLEN
+' ============================================================
+
+Private Sub BereichDatenNameSicherstellen( _
+    ByVal wsDash As Worksheet, _
+    ByVal c As Long, _
+    ByVal nameText As String)
+
+    Dim nm As name
+    Dim rngZiel As Range
+    Dim zielBezug As String
+
+    If wsDash Is Nothing Then Exit Sub
+    If c <= 0 Then Exit Sub
+    If Len(nameText) = 0 Then Exit Sub
+
+    Set rngZiel = wsDash.Columns(c)
+
+    zielBezug = "=" & _
+        wsDash.Name & "!" & _
+        rngZiel.Address( _
+            RowAbsolute:=True, _
+            ColumnAbsolute:=True, _
+            ReferenceStyle:=xlA1)
+
+    Set nm = Nothing
+
+    On Error Resume Next
+    Set nm = ThisWorkbook.Names(nameText)
+    On Error GoTo 0
+
+    If nm Is Nothing Then
+
+        Set nm = ThisWorkbook.Names.Add( _
+            Name:=nameText, _
+            RefersTo:=zielBezug, _
+            Visible:=True)
+
+    Else
+
+        nm.Visible = True
+        nm.RefersTo = zielBezug
+
+    End If
 
 End Sub
 
