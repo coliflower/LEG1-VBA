@@ -1538,16 +1538,22 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
                 ' unangetastet.
                 If DashboardSpalte(wsDash, nokName) > 0 Then
 
-                    LogEintrag _
+                    cNOK = DashboardSpalte(wsDash, nokName)
+
+                    TBBereichVorhandenAktualisieren _
+                        wsDash, _
+                        cNOK, _
+                        zeileSummen, _
+                        zeileSchwelle1, _
+                        zeileSchwelle2, _
+                        zeileBezuege, _
+                        cSpieler, _
+                        cT9, _
+                        zeileSpieler1, _
+                        letzteZeileDash, _
                         wsLog, _
-                        "TB__ BEREICH VORHANDEN", _
-                        "", _
-                        "Bereich '" & _
-                        bereichsName & _
-                        "' wurde erkannt, aber nicht neu angelegt. " & _
-                        "Der _NOK-Marker '" & _
-                        nokName & _
-                        "' existiert bereits."
+                        dateiname, _
+                        bereichsName
 
                 Else
 
@@ -2161,6 +2167,402 @@ End Sub
 ' ============================================================
 ' DATENSPALTEN DER DYNAMISCHEN BEREICHE GRUPPIEREN
 ' ============================================================
+
+Private Sub TBBereichVorhandenAktualisieren( _
+    ByVal wsDash As Worksheet, _
+    ByVal cNOK As Long, _
+    ByVal zeileSummen As Long, _
+    ByVal zeileSchwelle1 As Long, _
+    ByVal zeileSchwelle2 As Long, _
+    ByVal zeileBezuege As Long, _
+    ByVal cSpieler As Long, _
+    ByVal cT9 As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal letzteZeileDash As Long, _
+    ByVal wsLog As Worksheet, _
+    ByVal dateiname As String, _
+    ByVal bereichsName As String)
+
+    Dim wbQuelle As Workbook
+    Dim wsQuelle As Worksheet
+    Dim spielerWerte As Collection
+
+    Dim cStart As Long
+    Dim cEnde As Long
+    Dim c As Long
+    Dim i As Long
+    Dim blattIndex As Long
+    Dim anzahlBlaetter As Long
+    Dim letzteZeileQuelle As Long
+
+    Dim sheetName As String
+    Dim datenName As String
+    Dim spieler As String
+    Dim key As String
+    Dim wert As Variant
+    Dim dashboardWert As Variant
+    Dim schwelle1 As Variant
+    Dim schwelle2 As Variant
+    Dim schwelleVerwenden As Variant
+
+    Dim hatSchwelle1 As Boolean
+    Dim hatSchwelle2 As Boolean
+    Dim pruefen As Boolean
+    Dim istBewertbar As Boolean
+    Dim wertGefunden As Boolean
+    Dim anzahlAktiveUnterSchwelle As Long
+
+    Dim warBereitsOffen As Boolean
+    Dim dateipfad As String
+    Dim cAnzahlDaten As Long
+
+    If wsDash Is Nothing Then Exit Sub
+    If cNOK <= 0 Then Exit Sub
+
+    If Not BereichsGrenzenFuerNOKMarkerErmitteln( _
+            wsDash, _
+            DashboardSpalte(wsDash, LEG1_Basisdaten_Kopf), _
+            cNOK, _
+            cStart, _
+            cEnde) Then
+
+        LogEintrag _
+            wsLog, _
+            "TB__ WARNUNG", _
+            "", _
+            "Bereich '" & bereichsName & "' konnte nicht aktualisiert werden. " & _
+            "Die dynamischen Bereichsgrenzen konnten nicht ermittelt werden."
+
+        Exit Sub
+
+    End If
+
+    If cStart <= 0 Or cEnde < cStart Then Exit Sub
+
+    If Len(ThisWorkbook.Path) = 0 Then Exit Sub
+
+    dateipfad = _
+        ThisWorkbook.Path & _
+        Application.PathSeparator & _
+        dateiname
+
+    On Error Resume Next
+    Set wbQuelle = Workbooks(dateiname)
+    On Error GoTo OeffnenFehler
+
+    If wbQuelle Is Nothing Then
+
+        Set wbQuelle = Workbooks.Open( _
+            FileName:=dateipfad, _
+            UpdateLinks:=0, _
+            ReadOnly:=True, _
+            IgnoreReadOnlyRecommended:=True)
+
+    Else
+
+        warBereitsOffen = True
+
+    End If
+
+    If wbQuelle Is Nothing Then Exit Sub
+
+    anzahlBlaetter = wbQuelle.Worksheets.Count
+
+    If anzahlBlaetter <= 0 Then GoTo Aufraeumen
+
+    cAnzahlDaten = cEnde - cStart + 1
+
+    If anzahlBlaetter > cAnzahlDaten Then
+
+        LogEintrag _
+            wsLog, _
+            "TB__ WARNUNG", _
+            "", _
+            "Bereich '" & bereichsName & "' hat " & _
+            CStr(anzahlBlaetter) & " Quellblätter, aber nur " & _
+            CStr(cAnzahlDaten) & " vorhandene Datenspalten. " & _
+            "Neue Quellblätter wurden nicht automatisch ergänzt."
+
+    End If
+
+    ' Bestehende Ergebnisse des Bereichs vollständig zurücksetzen.
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cNOK), _
+        wsDash.Cells(letzteZeileDash, cNOK)).Value = 0
+
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cNOK), _
+        wsDash.Cells(letzteZeileDash, cNOK)).Font.ColorIndex = _
+        xlAutomatic
+
+    For c = cStart To cEnde
+
+        wsDash.Cells(1, c).Value = 0
+        wsDash.Cells(zeileSchwelle1, c).ClearContents
+        wsDash.Cells(zeileSchwelle2, c).ClearContents
+
+        If c <= cStart + anzahlBlaetter - 1 Then
+
+            Set wsQuelle = wbQuelle.Worksheets(c - cStart + 1)
+
+            sheetName = SichererText(wsQuelle.Name)
+
+            wsDash.Cells(zeileBezuege, c).Value = sheetName
+
+            datenName = ExcelNameBereinigen( _
+                bereichsName & "_" & sheetName)
+
+            BereichDatenNameSicherstellen _
+                wsDash, _
+                c, _
+                datenName
+
+            dashboardWert = Empty
+
+            hatSchwelle1 = _
+                VaultsWertFuerDashboard( _
+                    wsQuelle.Cells(1, 4).Value, _
+                    dashboardWert) > 0
+
+            If hatSchwelle1 Then
+                schwelle1 = wsQuelle.Cells(1, 4).Value
+                wsDash.Cells(zeileSchwelle1, c).Value = dashboardWert
+            Else
+                schwelle1 = Empty
+            End If
+
+            dashboardWert = Empty
+
+            hatSchwelle2 = _
+                VaultsWertFuerDashboard( _
+                    wsQuelle.Cells(1, 5).Value, _
+                    dashboardWert) > 0
+
+            If hatSchwelle2 Then
+                schwelle2 = wsQuelle.Cells(1, 5).Value
+                wsDash.Cells(zeileSchwelle2, c).Value = dashboardWert
+            Else
+                schwelle2 = Empty
+            End If
+
+            Set spielerWerte = New Collection
+
+            letzteZeileQuelle = _
+                wsQuelle.Cells( _
+                    wsQuelle.Rows.Count, _
+                    3).End(xlUp).Row
+
+            If letzteZeileQuelle >= 3 Then
+
+                For i = 3 To letzteZeileQuelle
+
+                    spieler = SichererText( _
+                        wsQuelle.Cells(i, 3).Value)
+
+                    If Len(spieler) > 0 Then
+
+                        key = SpielerKey(spieler)
+
+                        If CollectionKeyExistiert( _
+                                spielerWerte, _
+                                key) Then
+
+                            LogEintrag _
+                                wsLog, _
+                                "DUPLIKAT TB__", _
+                                spieler, _
+                                "Spieler kommt mehrfach im Quellblatt '" & _
+                                sheetName & "' der Datei '" & _
+                                dateiname & "' vor. Der erste Wert wird verwendet."
+
+                        Else
+
+                            spielerWerte.Add _
+                                wsQuelle.Cells(i, 5).Value, _
+                                key
+
+                        End If
+
+                    End If
+
+                Next i
+
+            End If
+
+            anzahlAktiveUnterSchwelle = 0
+
+            For i = zeileSpieler1 To letzteZeileDash
+
+                spieler = SichererText( _
+                    wsDash.Cells(i, cSpieler).Value)
+
+                If Len(spieler) > 0 Then
+
+                    key = SpielerKey(spieler)
+                    wertGefunden = CollectionKeyExistiert( _
+                        spielerWerte, _
+                        key)
+
+                    If wertGefunden Then
+
+                        wert = CollectionWert( _
+                            spielerWerte, _
+                            key)
+
+                        dashboardWert = Empty
+
+                        If VaultsWertFuerDashboard( _
+                                wert, _
+                                dashboardWert) > 0 Then
+
+                            wsDash.Cells(i, c).Value = dashboardWert
+
+                        Else
+
+                            wsDash.Cells(i, c).ClearContents
+
+                        End If
+
+                        pruefen = False
+                        schwelleVerwenden = Empty
+                        istBewertbar = False
+
+                        If hatSchwelle1 And hatSchwelle2 Then
+
+                            If IstEins( _
+                                    wsDash.Cells(i, cT9).Value) Then
+
+                                schwelleVerwenden = schwelle1
+
+                            Else
+
+                                schwelleVerwenden = schwelle2
+
+                            End If
+
+                            pruefen = True
+
+                        ElseIf (Not hatSchwelle1) And hatSchwelle2 Then
+
+                            schwelleVerwenden = schwelle2
+                            pruefen = True
+
+                        ElseIf hatSchwelle1 And (Not hatSchwelle2) Then
+
+                            If IstEins( _
+                                    wsDash.Cells(i, cT9).Value) Then
+
+                                schwelleVerwenden = schwelle1
+                                pruefen = True
+
+                            End If
+
+                        End If
+
+                        If pruefen Then
+
+                            If VaultsWertUnterSchwelle( _
+                                    wert, _
+                                    schwelleVerwenden, _
+                                    istBewertbar) Then
+
+                                If IstAktiv( _
+                                        wsDash.Cells(i, cBasisdaten).Value) Then
+
+                                    anzahlAktiveUnterSchwelle = _
+                                        anzahlAktiveUnterSchwelle + 1
+
+                                End If
+
+                                wsDash.Cells(i, c).Font.Color = _
+                                    RGB(255, 0, 0)
+
+                                wsDash.Cells(i, cNOK).Value = _
+                                    CLng( _
+                                        Val( _
+                                            wsDash.Cells(i, cNOK).Value)) + 1
+
+                            Else
+
+                                wsDash.Cells(i, c).Font.ColorIndex = _
+                                    xlAutomatic
+
+                            End If
+
+                        Else
+
+                            wsDash.Cells(i, c).Font.ColorIndex = _
+                                xlAutomatic
+
+                        End If
+
+                    Else
+
+                        wsDash.Cells(i, c).ClearContents
+                        wsDash.Cells(i, c).Font.ColorIndex = xlAutomatic
+
+                    End If
+
+                End If
+
+            Next i
+
+            wsDash.Cells(1, c).Value = _
+                anzahlAktiveUnterSchwelle
+
+        Else
+
+            ' Falls im Dashboard noch mehr Datenspalten vorhanden sind
+            ' als Quellblätter, werden deren alte Werte entfernt.
+            wsDash.Range( _
+                wsDash.Cells(zeileSpieler1, c), _
+                wsDash.Cells(letzteZeileDash, c)).ClearContents
+
+            wsDash.Cells(zeileBezuege, c).ClearContents
+
+        End If
+
+    Next c
+
+    wsDash.Cells(zeileBezuege, cNOK).Value = bereichsName
+
+    LogEintrag _
+        wsLog, _
+        "TB__ BEREICH AKTUALISIERT", _
+        "", _
+        "Bereich '" & bereichsName & "' wurde aus '" & _
+        dateiname & "' neu eingelesen. Datenspalten geprüft: " & _
+        CStr(cAnzahlDaten) & "."
+
+Aufraeumen:
+
+    If Not wbQuelle Is Nothing Then
+
+        If Not warBereitsOffen Then
+
+            On Error Resume Next
+            wbQuelle.Close SaveChanges:=False
+            On Error GoTo 0
+
+        End If
+
+    End If
+
+    Exit Sub
+
+OeffnenFehler:
+
+    LogEintrag _
+        wsLog, _
+        "TB__ WARNUNG", _
+        "", _
+        "Bereich '" & bereichsName & "' konnte aus '" & _
+        dateiname & "' nicht aktualisiert werden. Fehler " & _
+        CStr(Err.Number) & ": " & Err.Description
+
+    Resume Aufraeumen
+
+End Sub
 
 Private Sub BereichsDatenspaltenGruppieren( _
     ByVal ws As Worksheet, _
