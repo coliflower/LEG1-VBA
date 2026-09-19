@@ -2652,6 +2652,7 @@ Private Sub TB_BereichsformatierungSetzen( _
 
                     .Orientation = xlUpward
                     .Font.Color = RGB(255, 0, 0)
+                    .Font.Size = 9
                     .Interior.Pattern = xlNone
 
                 End With
