@@ -665,6 +665,15 @@ NaechsterUpdateSpielerNeu:
 
     cLetzterNOK = LetzterNOKMarker(wsDash)
 
+    schritt = "Formatierung der Bereichsspalten setzen"
+
+    TB_BereichsformatierungSetzen _
+        wsDash, _
+        cBasisdaten, _
+        zeileSchwelle1, _
+        zeileSchwelle2, _
+        zeileBezuege
+
     schritt = "Datenspalten der Bereiche gruppieren"
 
     BereichsDatenspaltenGruppieren _
@@ -2563,6 +2572,95 @@ OeffnenFehler:
         CStr(Err.Number) & ": " & Err.Description
 
     Resume Aufraeumen
+
+End Sub
+
+Private Sub TB_BereichsformatierungSetzen( _
+    ByVal ws As Worksheet, _
+    ByVal cBasisdaten As Long, _
+    ByVal zeileSchwelle1 As Long, _
+    ByVal zeileSchwelle2 As Long, _
+    ByVal zeileBezuege As Long)
+
+    Dim nokMarker As Collection
+    Dim cNOK As Long
+    Dim cStart As Long
+    Dim cEnde As Long
+    Dim c As Long
+
+    If cBasisdaten <= 0 Then Exit Sub
+    If zeileSchwelle1 <= 0 Then Exit Sub
+    If zeileSchwelle2 <= 0 Then Exit Sub
+    If zeileBezuege <= 0 Then Exit Sub
+
+    Set nokMarker = NOKMarkerSpaltenErmitteln(ws)
+
+    If nokMarker Is Nothing Then Exit Sub
+    If nokMarker.Count = 0 Then Exit Sub
+
+    For c = 1 To nokMarker.Count
+
+        cNOK = CLng(nokMarker(c))
+
+        If BereichsGrenzenFuerNOKMarkerErmitteln( _
+                ws, _
+                cBasisdaten, _
+                cNOK, _
+                cStart, _
+                cEnde) Then
+
+            If cEnde >= cStart Then
+
+                ' ------------------------------------------------
+                ' SCHWELLENZEILEN DER DATENSPALTEN
+                ' 1000er-Trennzeichen und blaue Schrift.
+                ' ------------------------------------------------
+
+                With ws.Range( _
+                        ws.Cells(zeileSchwelle1, cStart), _
+                        ws.Cells(zeileSchwelle1, cEnde))
+
+                    .NumberFormat = "#,##0"
+                    .Font.Color = RGB(0, 0, 255)
+
+                End With
+
+                With ws.Range( _
+                        ws.Cells(zeileSchwelle2, cStart), _
+                        ws.Cells(zeileSchwelle2, cEnde))
+
+                    .NumberFormat = "#,##0"
+                    .Font.Color = RGB(0, 0, 255)
+
+                End With
+
+                ' ------------------------------------------------
+                ' _NOK-MARKER
+                ' Gleiche Spaltenbreite wie die letzte
+                ' Datenspalte links davon.
+                ' ------------------------------------------------
+
+                ws.Columns(cNOK).ColumnWidth = _
+                    ws.Columns(cEnde).ColumnWidth
+
+                ' ------------------------------------------------
+                ' BEZUG DES _NOK-MARKERS
+                ' 90 Grad nach links, rot, ohne Füllung.
+                ' ------------------------------------------------
+
+                With ws.Cells(zeileBezuege, cNOK)
+
+                    .Orientation = xlUpward
+                    .Font.Color = RGB(255, 0, 0)
+                    .Interior.Pattern = xlNone
+
+                End With
+
+            End If
+
+        End If
+
+    Next c
 
 End Sub
 
