@@ -3641,7 +3641,6 @@ Private Sub T9SeitAktualisieren( _
         End If
 
     ' --------------------------------------------------------
-    ' --------------------------------------------------------
     ' T9_seit ist ein historischer Breakpoint.
     '
     ' Sobald ein Spieler erstmals T9 erreicht, wird das Datum
