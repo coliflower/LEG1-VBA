@@ -589,6 +589,14 @@ NaechsterUpdateSpielerNeu:
 
     Next i
 
+    schritt = "Aktive Spieler zählen"
+
+    AktiveSpielerZaehlenUndAnzeigen _
+        wsDash, _
+        cBasisdaten, _
+        zeileSpieler1, _
+        letzteZeileDash
+
     schritt = "T9 berechnen"
 
     T9AlleSpielerNeuBerechnen _
@@ -997,7 +1005,6 @@ Private Function VorherigerNOKMarker( _
                             End If
 
                         End If
-
                     End If
 
                 End If
@@ -1997,8 +2004,7 @@ Private Function ExcelNameBereinigen( _
     ByVal text As String) As String
 
     Dim i As Long
-    Dim ch As String
-    Dim ergebnis As String
+    Dim ch As String    Dim ergebnis As String
 
     text = Trim$(text)
 
@@ -2997,8 +3003,7 @@ Private Function IstEins( _
 End Function
 
 ' ============================================================
-' NUMERISCHER WERT
-' ============================================================
+' NUMERISCHER WERT' ============================================================
 
 Private Function NumerischerWert( _
     ByVal wert As Variant, _
@@ -3998,7 +4003,6 @@ Private Sub CarterBereichPruefen( _
     Dim anzahlUnterSchwelle As Long
     Dim schwelleGueltig As Boolean
     Dim spielerAktiv As Boolean
-
     If cBasisdaten <= 0 Then Exit Sub
 
     cCarterNOK = DashboardSpalte(wsDash, CARTER_NOK_Kopf)
@@ -4940,6 +4944,47 @@ NameKorrigierenFehler:
 End Sub
 
 ' ============================================================
+' AKTIVE SPIELER ZÄHLEN UND IN LEG1_BASISDATEN ANZEIGEN
+' ============================================================
+
+Private Sub AktiveSpielerZaehlenUndAnzeigen( _
+    ByVal ws As Worksheet, _
+    ByVal cBasisdaten As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal letzteZeile As Long)
+
+    Dim i As Long
+    Dim anzahlAktive As Long
+
+    If cBasisdaten <= 0 Then Exit Sub
+
+    If letzteZeile < zeileSpieler1 Then
+
+        With ws.Cells(1, cBasisdaten)
+            .Value = 0
+            .Font.Color = RGB(255, 0, 0)
+        End With
+
+        Exit Sub
+
+    End If
+
+    For i = zeileSpieler1 To letzteZeile
+
+        If IstAktiv(ws.Cells(i, cBasisdaten).Value) Then
+            anzahlAktive = anzahlAktive + 1
+        End If
+
+    Next i
+
+    With ws.Cells(1, cBasisdaten)
+        .Value = anzahlAktive
+        .Font.Color = RGB(255, 0, 0)
+    End With
+
+End Sub
+
+' ============================================================
 ' DASHBOARD SORTIEREN
 ' ============================================================
 
@@ -4998,7 +5043,6 @@ Private Sub DashboardSortieren( _
             MatchCase:=False, _
             Orientation:=xlTopToBottom, _
             DataOption1:=xlSortNormal
-
     End With
 
 End Sub
