@@ -454,24 +454,20 @@ Private Function DownloadTabelleAlsText( _
     Dim letzteZeile As Long
     Dim letzteSpalte As Long
     Dim r As Long
-    Dim c As Long
-    Dim v As String
+    Dim col As Long
+    Dim v As Variant
     Dim textGesamt As String
 
-    ' Normalfall: Die reine ASCII-Datei steht komplett in A1.
-    v = CStr(ws.Range("A1").Value2)
+    ' Die Base64-Datei wird absichtlich in mehrere ASCII-Zeilen
+    ' mit jeweils maximal 30.000 Zeichen aufgeteilt.
+    ' Dadurch bleibt jede Excel-Zelle unter dem Excel-Limit
+    ' von 32.767 Zeichen.
+    '
+    ' WICHTIG:
+    ' A1 darf hier NICHT als Sonderfall verwendet werden.
+    ' Auch wenn A1 belegt ist, koennen weitere Base64-Teile
+    ' in den folgenden Zeilen stehen.
 
-    If Len(v) > 0 Then
-        DownloadTabelleAlsText = Replace(v, """", vbNullString)
-        DownloadTabelleAlsText = Replace(DownloadTabelleAlsText, vbCr, vbNullString)
-        DownloadTabelleAlsText = Replace(DownloadTabelleAlsText, vbLf, vbNullString)
-        DownloadTabelleAlsText = Replace(DownloadTabelleAlsText, " ", vbNullString)
-        DownloadTabelleAlsText = Replace(DownloadTabelleAlsText, vbTab, vbNullString)
-        Exit Function
-    End If
-
-    ' Fallback: Falls Excel die Datei auf mehrere Zellen verteilt,
-    ' werden alle belegten Zellen in Reihenfolge zusammengesetzt.
     letzteZeile = LetzteBelegteZeile(ws)
     letzteSpalte = LetzteBelegteSpalte(ws)
 
@@ -481,14 +477,24 @@ Private Function DownloadTabelleAlsText( _
     End If
 
     For r = 1 To letzteZeile
-        For c = 1 To letzteSpalte
-            v = CStr(ws.Cells(r, c).Value2)
-            If Len(v) > 0 Then
-                textGesamt = textGesamt & v
+
+        For col = 1 To letzteSpalte
+
+            v = ws.Cells(r, col).Value2
+
+            If Not IsError(v) Then
+
+                If Len(CStr(v)) > 0 Then
+                    textGesamt = textGesamt & CStr(v)
+                End If
+
             End If
-        Next c
+
+        Next col
+
     Next r
 
+    ' Eventuelle Transport-Trennzeichen entfernen.
     textGesamt = Replace(textGesamt, """", vbNullString)
     textGesamt = Replace(textGesamt, vbCr, vbNullString)
     textGesamt = Replace(textGesamt, vbLf, vbNullString)
@@ -498,7 +504,6 @@ Private Function DownloadTabelleAlsText( _
     DownloadTabelleAlsText = textGesamt
 
 End Function
-
 
 ' ============================================================
 ' BASE64-INHALT AUS GITHUB-JSON HOLEN
