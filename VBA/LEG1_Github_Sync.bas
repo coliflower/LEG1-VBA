@@ -16,14 +16,22 @@ Option Explicit
 ' Das bestehende Modul LEG1_Spieler_Abgleich bleibt erhalten.
 ' Nur dessen Codeinhalt wird aktualisiert.
 '
-' BESONDERHEIT:
-' Der GitHub-Download wird als UTF-8 eingelesen.
-' Zusätzlich werden überflüssige CR-Zeichen aus den einzelnen
-' Download-Zeilen entfernt, bevor AddFromString verwendet wird.
+' DOWNLOAD:
+' Die GitHub-API liefert den Inhalt der BAS-Datei als Base64.
+' Dadurch wird das UTF-8-Problem des direkten QueryTable-
+' Downloads vermieden.
+'
+' Es wird NICHT verwendet:
+'   - TextFilePlatform
+'   - Windows API
+'   - FileSystemObject
+'   - Scripting.Dictionary
+'   - WScript
+'   - CreateObject
 ' ============================================================
 
-Private Const GITHUB_RAW_URL As String = _
-    "https://raw.githubusercontent.com/coliflower/LEG1-VBA/main/VBA/LEG1_Spieler_Abgleich.bas"
+Private Const GITHUB_API_URL As String = _
+    "https://api.github.com/repos/coliflower/LEG1-VBA/contents/VBA/LEG1_Spieler_Abgleich.bas?ref=main"
 
 Private Const TARGET_MODULE As String = _
     "LEG1_Spieler_Abgleich"
@@ -73,17 +81,17 @@ Public Sub LEG1_GitHub_Synchronisieren()
     Application.EnableEvents = False
     Application.DisplayAlerts = False
 
-    schritt = "VBA-Projekt öffnen"
+    schritt = "VBA-Projekt oeffnen"
 
     Set vbProj = GetVBProject()
 
     If vbProj Is Nothing Then
         Err.Raise vbObjectError + 1000, _
                   "LEG1_GitHub_Sync", _
-                  "Das VBA-Projekt konnte nicht geöffnet werden."
+                  "Das VBA-Projekt konnte nicht geoeffnet werden."
     End If
 
-    schritt = "LEG1_Spieler_Abgleich-Modul prüfen"
+    schritt = "LEG1_Spieler_Abgleich-Modul pruefen"
 
     Set targetComp = GetVBComponent(vbProj, TARGET_MODULE)
 
@@ -136,24 +144,13 @@ Public Sub LEG1_GitHub_Synchronisieren()
                   "Die heruntergeladene GitHub-Datei ist leer."
     End If
 
-    schritt = "GitHub-VBA-Code prüfen"
+    schritt = "GitHub-VBA-Code pruefen"
 
     If Not BasDateiIstGueltig(sourceCode) Then
         Err.Raise vbObjectError + 1006, _
                   "LEG1_GitHub_Sync", _
                   "Die heruntergeladene Datei sieht nicht wie " & _
-                  "ein gültiges VBA-Modul aus."
-    End If
-
-    schritt = "Zeichenkodierung prüfen"
-
-    If Not ZeichenkodierungIstKorrekt(sourceCode) Then
-        Err.Raise vbObjectError + 1007, _
-                  "LEG1_GitHub_Sync", _
-                  "Der GitHub-Code wurde beim Download offenbar " & _
-                  "mit einer falschen Zeichenkodierung eingelesen." & _
-                  vbCrLf & vbCrLf & _
-                  "Der vorhandene LEG1-Code wurde deshalb nicht verändert."
+                  "ein gueltiges VBA-Modul aus."
     End If
 
     schritt = "GitHub-Code normalisieren"
@@ -161,7 +158,7 @@ Public Sub LEG1_GitHub_Synchronisieren()
     sourceCode = VBAQuelltextNormalisieren(sourceCode)
 
     If Len(Trim$(sourceCode)) = 0 Then
-        Err.Raise vbObjectError + 1008, _
+        Err.Raise vbObjectError + 1007, _
                   "LEG1_GitHub_Sync", _
                   "Der normalisierte GitHub-Code ist leer."
     End If
@@ -172,34 +169,34 @@ Public Sub LEG1_GitHub_Synchronisieren()
 
     neuerCodeGeschrieben = True
 
-    schritt = "Neue LEG1-Version prüfen"
+    schritt = "Neue LEG1-Version pruefen"
 
     If targetComp.CodeModule.CountOfLines = 0 Then
-        Err.Raise vbObjectError + 1009, _
+        Err.Raise vbObjectError + 1008, _
                   "LEG1_GitHub_Sync", _
                   "Der neue GitHub-Code wurde nicht korrekt " & _
                   "in das Zielmodul geschrieben."
     End If
 
-    schritt = "LEG1-Modulnamen prüfen"
+    schritt = "LEG1-Modulnamen pruefen"
 
     If StrComp(targetComp.Name, TARGET_MODULE, vbTextCompare) <> 0 Then
-        Err.Raise vbObjectError + 1010, _
+        Err.Raise vbObjectError + 1009, _
                   "LEG1_GitHub_Sync", _
-                  "Der Name des Zielmoduls hat sich unerwartet geändert."
+                  "Der Name des Zielmoduls hat sich unerwartet geaendert."
     End If
 
-    schritt = "LEG1_GitHub_Sync-Schutz prüfen"
+    schritt = "LEG1_GitHub_Sync-Schutz pruefen"
 
     If GetVBComponent(vbProj, SYNC_MODULE) Is Nothing Then
-        Err.Raise vbObjectError + 1011, _
+        Err.Raise vbObjectError + 1010, _
                   "LEG1_GitHub_Sync", _
                   "Das Sync-Modul " & _
                   SYNC_MODULE & _
                   " ist nicht mehr vorhanden."
     End If
 
-    schritt = "Temporäre Download-Tabelle entfernen"
+    schritt = "Temporaere Download-Tabelle entfernen"
 
     DeleteDownloadSheet wb, wsDownload
 
@@ -214,7 +211,7 @@ Public Sub LEG1_GitHub_Synchronisieren()
         vbCrLf & _
         "Es wurde kein neues Modul erzeugt." & _
         vbCrLf & _
-        "LEG1_GitHub_Sync wurde nicht verändert.", _
+        "LEG1_GitHub_Sync wurde nicht veraendert.", _
         vbInformation, _
         "LEG1 GitHub Sync"
 
@@ -280,7 +277,7 @@ Private Function CodeModulLesen( _
     End If
 
     CodeModulLesen = _
-        vbComp.CodeModule.lines(1, anzahlZeilen)
+        vbComp.CodeModule.Lines(1, anzahlZeilen)
 
 End Function
 
@@ -319,11 +316,18 @@ End Sub
 ' ============================================================
 ' GITHUB DOWNLOAD
 '
-' Der Download wird explizit als UTF-8 angefordert.
+' Es wird die GitHub-API aufgerufen.
 '
-' WICHTIG:
-' TextFileParseType wird NICHT gesetzt, weil genau diese
-' Eigenschaft auf Excel/Mac zuvor Fehler 1004 verursacht hat.
+' Die API liefert:
+'
+' {
+'   "name": "...",
+'   "content": "BASE64...",
+'   ...
+' }
+'
+' Der eigentliche VBA-Code wird daher nicht als UTF-8-Text
+' durch Excel transportiert.
 ' ============================================================
 
 Private Function DownloadGitHubSource( _
@@ -347,7 +351,7 @@ Private Function DownloadGitHubSource( _
     ws.Name = DOWNLOAD_SHEET
 
     Set qt = ws.QueryTables.Add( _
-        Connection:="URL;" & GITHUB_RAW_URL, _
+        Connection:="URL;" & GITHUB_API_URL, _
         Destination:=ws.Range("A1"))
 
     With qt
@@ -355,34 +359,6 @@ Private Function DownloadGitHubSource( _
         .BackgroundQuery = False
         .RefreshStyle = xlOverwriteCells
         .AdjustColumnWidth = False
-
-        ' ----------------------------------------------------
-        ' UTF-8 erzwingen.
-        ' Falls Excel diese Eigenschaft auf der jeweiligen
-        ' Plattform nicht unterstützt, wird der Fehler
-        ' kontrolliert zurückgegeben.
-        ' ----------------------------------------------------
-
-        On Error Resume Next
-
-        Err.Clear
-        .TextFilePlatform = 65001
-
-        downloadErrorNumber = Err.Number
-        downloadErrorDescription = Err.Description
-
-        On Error GoTo Fehler
-
-        If downloadErrorNumber <> 0 Then
-
-            Err.Raise downloadErrorNumber, _
-                      "LEG1_GitHub_Sync / UTF-8", _
-                      "Die Excel-Version konnte den GitHub-Download " & _
-                      "nicht als UTF-8 konfigurieren." & _
-                      vbCrLf & vbCrLf & _
-                      downloadErrorDescription
-
-        End If
 
         On Error Resume Next
 
@@ -404,12 +380,12 @@ Private Function DownloadGitHubSource( _
 
     End With
 
-    If Len(Trim$(CStr(ws.Range("A1").Value))) = 0 Then
+    If LetzteBelegteZeile(ws) < 1 Then
 
         Err.Raise vbObjectError + 1100, _
                   "LEG1_GitHub_Sync", _
                   "GitHub wurde erreicht, aber es wurde kein Inhalt " & _
-                  "in A1 geladen."
+                  "geladen."
 
     End If
 
@@ -444,30 +420,57 @@ End Function
 
 
 ' ============================================================
-' DOWNLOAD-TABELLE -> VBA SOURCECODE
-'
-' Excel kann beim Einlesen einer Textdatei ein CR am Ende
-' einer Zelle belassen. Dieses wird hier entfernt.
-'
-' Dadurch entstehen keine CRCRLF-Sequenzen mehr.
+' DOWNLOAD-TABELLE -> BASE64 -> VBA SOURCECODE
 ' ============================================================
 
 Private Function DownloadTabelleZuCode( _
     ByVal ws As Worksheet) As String
 
-    Dim lastRow As Long
-    Dim r As Long
+    Dim jsonText As String
+    Dim base64Text As String
 
-    Dim lineText As String
+    jsonText = DownloadTabelleAlsText(ws)
+
+    If Len(jsonText) = 0 Then
+        DownloadTabelleZuCode = vbNullString
+        Exit Function
+    End If
+
+    base64Text = GitHubBase64AusJSON(jsonText)
+
+    If Len(base64Text) = 0 Then
+        Err.Raise vbObjectError + 1200, _
+                  "LEG1_GitHub_Sync", _
+                  "Der GitHub-API-Antwort konnte kein " & _
+                  "Base64-Dateiinhalt entnommen werden."
+    End If
+
+    DownloadTabelleZuCode = Base64UTF8Dekodieren(base64Text)
+
+End Function
+
+
+' ============================================================
+' KOMPLETTE DOWNLOAD-TABELLE ALS TEXT LESEN
+' ============================================================
+
+Private Function DownloadTabelleAlsText( _
+    ByVal ws As Worksheet) As String
+
+    Dim lastRow As Long
+    Dim lastCol As Long
+
+    Dim r As Long
+    Dim c As Long
+
+    Dim cellText As String
     Dim result As String
 
-    lastRow = _
-        ws.Cells( _
-            ws.Rows.Count, _
-            1).End(xlUp).Row
+    lastRow = LetzteBelegteZeile(ws)
+    lastCol = LetzteBelegteSpalte(ws)
 
-    If lastRow < 1 Then
-        DownloadTabelleZuCode = vbNullString
+    If lastRow < 1 Or lastCol < 1 Then
+        DownloadTabelleAlsText = vbNullString
         Exit Function
     End If
 
@@ -475,39 +478,335 @@ Private Function DownloadTabelleZuCode( _
 
     For r = 1 To lastRow
 
-        lineText = CStr(ws.Cells(r, 1).Value)
+        For c = 1 To lastCol
 
-        ' ----------------------------------------------------
-        ' Alle vorhandenen Zeilenende-Zeichen am Ende
-        ' der einzelnen Excel-Zelle entfernen.
-        ' ----------------------------------------------------
+            cellText = CStr(ws.Cells(r, c).Value)
 
-        Do While Len(lineText) > 0
-
-            If Right$(lineText, 1) = vbCr Or _
-               Right$(lineText, 1) = vbLf Then
-
-                lineText = Left$( _
-                    lineText, _
-                    Len(lineText) - 1)
-
-            Else
-
-                Exit Do
-
+            If Len(cellText) > 0 Then
+                result = result & cellText
             End If
 
-        Loop
-
-        If r > 1 Then
-            result = result & vbCrLf
-        End If
-
-        result = result & lineText
+        Next c
 
     Next r
 
-    DownloadTabelleZuCode = result
+    DownloadTabelleAlsText = result
+
+End Function
+
+
+' ============================================================
+' BASE64-INHALT AUS GITHUB-JSON HOLEN
+' ============================================================
+
+Private Function GitHubBase64AusJSON( _
+    ByVal jsonText As String) As String
+
+    Dim marker As String
+    Dim startPos As Long
+    Dim endPos As Long
+
+    Dim contentText As String
+
+    marker = """content"":"""
+
+    startPos = InStr(1, jsonText, marker, vbBinaryCompare)
+
+    If startPos = 0 Then
+        GitHubBase64AusJSON = vbNullString
+        Exit Function
+    End If
+
+    startPos = startPos + Len(marker)
+
+    endPos = InStr(startPos, jsonText, """", vbBinaryCompare)
+
+    If endPos = 0 Then
+        GitHubBase64AusJSON = vbNullString
+        Exit Function
+    End If
+
+    contentText = Mid$( _
+        jsonText, _
+        startPos, _
+        endPos - startPos)
+
+    contentText = Replace(contentText, vbCr, vbNullString)
+    contentText = Replace(contentText, vbLf, vbNullString)
+    contentText = Replace(contentText, " ", vbNullString)
+    contentText = Replace(contentText, vbTab, vbNullString)
+
+    GitHubBase64AusJSON = contentText
+
+End Function
+
+
+' ============================================================
+' BASE64 -> UTF-8 -> VBA STRING
+' ============================================================
+
+Private Function Base64UTF8Dekodieren( _
+    ByVal base64Text As String) As String
+
+    Dim data() As Byte
+    Dim dataLength As Long
+
+    data = Base64Dekodieren(base64Text, dataLength)
+
+    If dataLength <= 0 Then
+        Base64UTF8Dekodieren = vbNullString
+        Exit Function
+    End If
+
+    Base64UTF8Dekodieren = UTF8BytesZuString(data, dataLength)
+
+End Function
+
+
+' ============================================================
+' BASE64 DEKODIEREN
+' ============================================================
+
+Private Function Base64Dekodieren( _
+    ByVal base64Text As String, _
+    ByRef dataLength As Long) As Byte()
+
+    Dim output() As Byte
+
+    Dim i As Long
+    Dim n As Long
+
+    Dim a As Long
+    Dim b As Long
+    Dim c As Long
+    Dim d As Long
+
+    Dim ch As String
+
+    ReDim output(0 To 0)
+
+    dataLength = 0
+
+    base64Text = Replace(base64Text, vbCr, vbNullString)
+    base64Text = Replace(base64Text, vbLf, vbNullString)
+    base64Text = Replace(base64Text, " ", vbNullString)
+    base64Text = Replace(base64Text, vbTab, vbNullString)
+
+    n = Len(base64Text)
+
+    If n = 0 Then
+        Base64Dekodieren = output
+        Exit Function
+    End If
+
+    ReDim output(0 To ((n \ 4) * 3) + 2)
+
+    For i = 1 To n Step 4
+
+        a = Base64Wert(Mid$(base64Text, i, 1))
+
+        If i + 1 <= n Then
+            b = Base64Wert(Mid$(base64Text, i + 1, 1))
+        Else
+            b = 0
+        End If
+
+        If i + 2 <= n Then
+            ch = Mid$(base64Text, i + 2, 1)
+            If ch = "=" Then
+                c = 0
+            Else
+                c = Base64Wert(ch)
+            End If
+        Else
+            c = 0
+        End If
+
+        If i + 3 <= n Then
+            ch = Mid$(base64Text, i + 3, 1)
+            If ch = "=" Then
+                d = 0
+            Else
+                d = Base64Wert(ch)
+            End If
+        Else
+            d = 0
+        End If
+
+        output(dataLength) = _
+            CByte((a * 64) + (b \ 4))
+
+        dataLength = dataLength + 1
+
+        If i + 2 <= n Then
+            If Mid$(base64Text, i + 2, 1) <> "=" Then
+                output(dataLength) = _
+                    CByte(((b And 3) * 64) + (c \ 16))
+                dataLength = dataLength + 1
+            End If
+        End If
+
+        If i + 3 <= n Then
+            If Mid$(base64Text, i + 3, 1) <> "=" Then
+                output(dataLength) = _
+                    CByte(((c And 15) * 16) + d)
+                dataLength = dataLength + 1
+            End If
+        End If
+
+    Next i
+
+    If dataLength > 0 Then
+        ReDim Preserve output(0 To dataLength - 1)
+    Else
+        ReDim output(0 To 0)
+    End If
+
+    Base64Dekodieren = output
+
+End Function
+
+
+' ============================================================
+' BASE64 ZEICHEN -> WERT
+' ============================================================
+
+Private Function Base64Wert( _
+    ByVal ch As String) As Long
+
+    Dim n As Long
+
+    If Len(ch) = 0 Then
+        Base64Wert = 0
+        Exit Function
+    End If
+
+    n = AscW(ch)
+
+    Select Case n
+
+        Case 65 To 90
+            Base64Wert = n - 65
+
+        Case 97 To 122
+            Base64Wert = n - 97 + 26
+
+        Case 48 To 57
+            Base64Wert = n - 48 + 52
+
+        Case 43
+            Base64Wert = 62
+
+        Case 47
+            Base64Wert = 63
+
+        Case Else
+            Err.Raise vbObjectError + 1201, _
+                      "LEG1_GitHub_Sync", _
+                      "Ungueltiges Base64-Zeichen: " & ch
+
+    End Select
+
+End Function
+
+
+' ============================================================
+' UTF-8 BYTE ARRAY -> VBA UNICODE STRING
+' ============================================================
+
+Private Function UTF8BytesZuString( _
+    ByRef data() As Byte, _
+    ByVal dataLength As Long) As String
+
+    Dim i As Long
+
+    Dim b1 As Long
+    Dim b2 As Long
+    Dim b3 As Long
+    Dim b4 As Long
+
+    Dim codePoint As Long
+
+    Dim result As String
+
+    result = vbNullString
+
+    i = 0
+
+    Do While i < dataLength
+
+        b1 = data(i)
+
+        If b1 < 128 Then
+
+            result = result & ChrW$(b1)
+            i = i + 1
+
+        ElseIf b1 >= 192 And b1 <= 223 Then
+
+            If i + 1 >= dataLength Then Exit Do
+
+            b2 = data(i + 1)
+
+            codePoint = _
+                ((b1 And 31) * 64) + _
+                (b2 And 63)
+
+            result = result & ChrW$(codePoint)
+
+            i = i + 2
+
+        ElseIf b1 >= 224 And b1 <= 239 Then
+
+            If i + 2 >= dataLength Then Exit Do
+
+            b2 = data(i + 1)
+            b3 = data(i + 2)
+
+            codePoint = _
+                ((b1 And 15) * 4096) + _
+                ((b2 And 63) * 64) + _
+                (b3 And 63)
+
+            result = result & ChrW$(codePoint)
+
+            i = i + 3
+
+        ElseIf b1 >= 240 And b1 <= 247 Then
+
+            If i + 3 >= dataLength Then Exit Do
+
+            b2 = data(i + 1)
+            b3 = data(i + 2)
+            b4 = data(i + 3)
+
+            codePoint = _
+                ((b1 And 7) * 262144) + _
+                ((b2 And 63) * 4096) + _
+                ((b3 And 63) * 64) + _
+                (b4 And 63)
+
+            codePoint = codePoint - &H10000
+
+            result = result & _
+                     ChrW$(&HD800 Or (codePoint \ 1024))
+
+            result = result & _
+                     ChrW$(&HDC00 Or (codePoint And 1023))
+
+            i = i + 4
+
+        Else
+
+            Err.Raise vbObjectError + 1202, _
+                      "LEG1_GitHub_Sync", _
+                      "Ungueltige UTF-8-Daten im GitHub-Code."
+
+        End If
+
+    Loop
+
+    UTF8BytesZuString = result
 
 End Function
 
@@ -523,17 +822,8 @@ Private Function VBAQuelltextNormalisieren( _
 
     t = sourceCode
 
-    ' --------------------------------------------------------
-    ' Alle Zeilenenden zunächst vereinheitlichen.
-    ' --------------------------------------------------------
-
     t = Replace(t, vbCrLf, vbLf)
     t = Replace(t, vbCr, vbLf)
-
-    ' --------------------------------------------------------
-    ' Danach exakt auf CRLF für das VBA-CodeModule bringen.
-    ' --------------------------------------------------------
-
     t = Replace(t, vbLf, vbCrLf)
 
     VBAQuelltextNormalisieren = t
@@ -568,23 +858,17 @@ Private Function BasDateiIstGueltig( _
     End If
 
     If InStr(1, t, "Option Explicit", vbTextCompare) = 0 Then
-
         If InStr(1, t, "Sub ", vbTextCompare) = 0 And _
            InStr(1, t, "Function ", vbTextCompare) = 0 Then
-
             BasDateiIstGueltig = False
             Exit Function
-
         End If
-
     End If
 
     If InStr(1, t, "Public Sub LEG1_Spieler_Abgleich", _
              vbTextCompare) = 0 Then
-
         BasDateiIstGueltig = False
         Exit Function
-
     End If
 
     BasDateiIstGueltig = True
@@ -593,77 +877,63 @@ End Function
 
 
 ' ============================================================
-' ZEICHENKODIERUNG PRÜFEN
-'
-' Die GitHub-Datei enthält deutsche Umlaute.
-' Insbesondere "über" ist im aktuellen GitHub-Code vorhanden.
-'
-' Typische UTF-8/ANSI-Fehlinterpretationen werden abgefangen.
+' LETZTE BELEGTE ZEILE
 ' ============================================================
 
-Private Function ZeichenkodierungIstKorrekt( _
-    ByVal sourceCode As String) As Boolean
+Private Function LetzteBelegteZeile( _
+    ByVal ws As Worksheet) As Long
 
-    Dim t As String
+    Dim letzteZelle As Range
 
-    t = sourceCode
+    On Error Resume Next
 
-    ' --------------------------------------------------------
-    ' Bekannte Fehlinterpretationen erkennen.
-    ' --------------------------------------------------------
+    Set letzteZelle = ws.Cells.Find( _
+        What:="*", _
+        After:=ws.Range("A1"), _
+        LookIn:=xlFormulas, _
+        LookAt:=xlPart, _
+        SearchOrder:=xlByRows, _
+        SearchDirection:=xlPrevious, _
+        MatchCase:=False)
 
-    If InStr(1, t, "√º", vbBinaryCompare) > 0 Then
-        ZeichenkodierungIstKorrekt = False
-        Exit Function
+    On Error GoTo 0
+
+    If letzteZelle Is Nothing Then
+        LetzteBelegteZeile = 0
+    Else
+        LetzteBelegteZeile = letzteZelle.Row
     End If
 
-    If InStr(1, t, "√?", vbBinaryCompare) > 0 Then
-        ZeichenkodierungIstKorrekt = False
-        Exit Function
+End Function
+
+
+' ============================================================
+' LETZTE BELEGTE SPALTE
+' ============================================================
+
+Private Function LetzteBelegteSpalte( _
+    ByVal ws As Worksheet) As Long
+
+    Dim letzteZelle As Range
+
+    On Error Resume Next
+
+    Set letzteZelle = ws.Cells.Find( _
+        What:="*", _
+        After:=ws.Range("A1"), _
+        LookIn:=xlFormulas, _
+        LookAt:=xlPart, _
+        SearchOrder:=xlByColumns, _
+        SearchDirection:=xlPrevious, _
+        MatchCase:=False)
+
+    On Error GoTo 0
+
+    If letzteZelle Is Nothing Then
+        LetzteBelegteSpalte = 0
+    Else
+        LetzteBelegteSpalte = letzteZelle.Column
     End If
-
-    If InStr(1, t, "√¶", vbBinaryCompare) > 0 Then
-        ZeichenkodierungIstKorrekt = False
-        Exit Function
-    End If
-
-    If InStr(1, t, "√„", vbBinaryCompare) > 0 Then
-        ZeichenkodierungIstKorrekt = False
-        Exit Function
-    End If
-
-    If InStr(1, t, "√–", vbBinaryCompare) > 0 Then
-        ZeichenkodierungIstKorrekt = False
-        Exit Function
-    End If
-
-    If InStr(1, t, "√œ", vbBinaryCompare) > 0 Then
-        ZeichenkodierungIstKorrekt = False
-        Exit Function
-    End If
-
-    If InStr(1, t, "√Ÿ", vbBinaryCompare) > 0 Then
-        ZeichenkodierungIstKorrekt = False
-        Exit Function
-    End If
-
-    If InStr(1, t, "Ã", vbBinaryCompare) > 0 Then
-        ZeichenkodierungIstKorrekt = False
-        Exit Function
-    End If
-
-    ' --------------------------------------------------------
-    ' Die aktuelle GitHub-Datei enthält "über".
-    ' Wenn es fehlt, gehen wir sicherheitshalber davon aus,
-    ' dass die Kodierung nicht korrekt übernommen wurde.
-    ' --------------------------------------------------------
-
-    If InStr(1, t, "über", vbBinaryCompare) = 0 Then
-        ZeichenkodierungIstKorrekt = False
-        Exit Function
-    End If
-
-    ZeichenkodierungIstKorrekt = True
 
 End Function
 
@@ -701,7 +971,7 @@ End Function
 
 
 ' ============================================================
-' TEMPORÄRES DOWNLOAD-BLATT LÖSCHEN
+' TEMPORAERES DOWNLOAD-BLATT LOESCHEN
 ' ============================================================
 
 Private Sub DeleteDownloadSheet( _
@@ -711,14 +981,11 @@ Private Sub DeleteDownloadSheet( _
     On Error Resume Next
 
     If Not ws Is Nothing Then
-
         Application.DisplayAlerts = False
         ws.Delete
         Application.DisplayAlerts = True
-
     End If
 
     On Error GoTo 0
 
 End Sub
-
