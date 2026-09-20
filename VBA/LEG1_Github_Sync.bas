@@ -430,48 +430,75 @@ Private Function DownloadTabelleZuCode( _
     Dim v As Variant
     Dim chunk As String
     Dim base64Text As String
+    Dim n As Long
 
-    ' Die Transportdatei besteht aus mehreren Base64-Zeilen.
-    ' Wir lesen die Zeilen einzeln und dekodieren erst danach.
-    ' Wichtig: Die 30.000-Zeichen-Bloecke sind durch 4 teilbar.
+    On Error GoTo Fehler
 
     letzteZeile = LetzteBelegteZeile(ws)
 
     If letzteZeile <= 0 Then
         Err.Raise vbObjectError + 1200, _
                   "LEG1_GitHub_Sync", _
-                  "Die GitHub-Base64-Datei konnte nicht gelesen werden."
+                  "Keine Download-Zeilen gefunden."
     End If
 
+    ' Diagnose/Fix:
+    ' Die Base64-Datei wird zeilenweise gelesen. Dabei wird
+    ' bewusst nur die tatsaechliche Zeilenanzahl verarbeitet.
     For r = 1 To letzteZeile
 
         v = ws.Cells(r, 1).Value2
 
-        If Not IsError(v) Then
+        If IsError(v) Then
+            Err.Raise vbObjectError + 1201, _
+                      "LEG1_GitHub_Sync", _
+                      "Download-Zelle A" & CStr(r) & " enthaelt einen Excel-Fehlerwert."
+        End If
 
-            chunk = CStr(v)
+        chunk = CStr(v)
 
-            If Len(chunk) > 0 Then
-                base64Text = base64Text & chunk
-            End If
+        If Len(chunk) > 0 Then
+            chunk = Replace(chunk, """", vbNullString)
+            chunk = Replace(chunk, vbCr, vbNullString)
+            chunk = Replace(chunk, vbLf, vbNullString)
+            chunk = Replace(chunk, " ", vbNullString)
+            chunk = Replace(chunk, vbTab, vbNullString)
 
+            base64Text = base64Text & chunk
         End If
 
     Next r
 
-    base64Text = Replace(base64Text, """", vbNullString)
-    base64Text = Replace(base64Text, vbCr, vbNullString)
-    base64Text = Replace(base64Text, vbLf, vbNullString)
-    base64Text = Replace(base64Text, " ", vbNullString)
-    base64Text = Replace(base64Text, vbTab, vbNullString)
+    n = Len(base64Text)
 
-    If Len(base64Text) = 0 Then
-        Err.Raise vbObjectError + 1200, _
+    If n = 0 Then
+        Err.Raise vbObjectError + 1202, _
                   "LEG1_GitHub_Sync", _
-                  "Die GitHub-Base64-Datei konnte nicht gelesen werden."
+                  "Die Download-Tabelle enthaelt keinen Base64-Inhalt."
     End If
 
+    If (n Mod 4) <> 0 Then
+        Err.Raise vbObjectError + 1203, _
+                  "LEG1_GitHub_Sync", _
+                  "Base64-Laenge ist ungueltig: " & CStr(n) & " Zeichen."
+    End If
+
+    ' Erst jetzt dekodieren.
     DownloadTabelleZuCode = Base64UTF8Dekodieren(base64Text)
+
+    Exit Function
+
+Fehler:
+
+    Err.Raise Err.Number, _
+              "LEG1_GitHub_Sync / DownloadTabelleZuCode", _
+              "Fehler beim Lesen/Dekodieren der Download-Tabelle." & _
+              vbCrLf & _
+              "Zeile: " & CStr(r) & _
+              vbCrLf & _
+              "Base64-Laenge bisher: " & CStr(Len(base64Text)) & _
+              vbCrLf & _
+              "Originalfehler: " & Err.Description
 
 End Function
 
