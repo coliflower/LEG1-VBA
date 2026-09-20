@@ -1080,7 +1080,7 @@ Private Sub LogTabelleAnzeigen(ByVal wb As Workbook)
 
     On Error Resume Next
 
-    Set wsLog = wb.Worksheets("Log")
+    Set wsLog = wb.Worksheets("LEG1_Log")
 
     If Not wsLog Is Nothing Then
         wsLog.Activate
