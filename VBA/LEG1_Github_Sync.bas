@@ -425,13 +425,45 @@ End Function
 Private Function DownloadTabelleZuCode( _
     ByVal ws As Worksheet) As String
 
+    Dim letzteZeile As Long
+    Dim r As Long
+    Dim v As Variant
+    Dim chunk As String
     Dim base64Text As String
 
-    ' Der Download ist jetzt eine reine ASCII-Base64-Datei.
-    ' Dadurch gibt es beim Transport durch Excel kein UTF-8-
-    ' oder JSON-Parsing-Problem mehr.
+    ' Die Transportdatei besteht aus mehreren Base64-Zeilen.
+    ' Wir lesen die Zeilen einzeln und dekodieren erst danach.
+    ' Wichtig: Die 30.000-Zeichen-Bloecke sind durch 4 teilbar.
 
-    base64Text = DownloadTabelleAlsText(ws)
+    letzteZeile = LetzteBelegteZeile(ws)
+
+    If letzteZeile <= 0 Then
+        Err.Raise vbObjectError + 1200, _
+                  "LEG1_GitHub_Sync", _
+                  "Die GitHub-Base64-Datei konnte nicht gelesen werden."
+    End If
+
+    For r = 1 To letzteZeile
+
+        v = ws.Cells(r, 1).Value2
+
+        If Not IsError(v) Then
+
+            chunk = CStr(v)
+
+            If Len(chunk) > 0 Then
+                base64Text = base64Text & chunk
+            End If
+
+        End If
+
+    Next r
+
+    base64Text = Replace(base64Text, """", vbNullString)
+    base64Text = Replace(base64Text, vbCr, vbNullString)
+    base64Text = Replace(base64Text, vbLf, vbNullString)
+    base64Text = Replace(base64Text, " ", vbNullString)
+    base64Text = Replace(base64Text, vbTab, vbNullString)
 
     If Len(base64Text) = 0 Then
         Err.Raise vbObjectError + 1200, _
@@ -442,7 +474,6 @@ Private Function DownloadTabelleZuCode( _
     DownloadTabelleZuCode = Base64UTF8Dekodieren(base64Text)
 
 End Function
-
 
 ' ============================================================
 ' KOMPLETTE DOWNLOAD-TABELLE ALS TEXT LESEN
