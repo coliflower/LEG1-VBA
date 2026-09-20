@@ -1,4 +1,3 @@
-Attribute VB_Name = "LEG1_GitHub_Sync"
 Option Explicit
 
 ' ============================================================
