@@ -30,7 +30,7 @@ Option Explicit
 ' ============================================================
 
 Private Const GITHUB_API_URL As String = _
-    "https://api.github.com/repos/coliflower/LEG1-VBA/contents/VBA/LEG1_Spieler_Abgleich.bas?ref=main"
+    "https://raw.githubusercontent.com/coliflower/LEG1-VBA/main/VBA/LEG1_Spieler_Abgleich.b64"
 
 Private Const TARGET_MODULE As String = _
     "LEG1_Spieler_Abgleich"
@@ -425,23 +425,18 @@ End Function
 Private Function DownloadTabelleZuCode( _
     ByVal ws As Worksheet) As String
 
-    Dim jsonText As String
     Dim base64Text As String
 
-    jsonText = DownloadTabelleAlsText(ws)
+    ' Der Download ist jetzt eine reine ASCII-Base64-Datei.
+    ' Dadurch gibt es beim Transport durch Excel kein UTF-8-
+    ' oder JSON-Parsing-Problem mehr.
 
-    If Len(jsonText) = 0 Then
-        DownloadTabelleZuCode = vbNullString
-        Exit Function
-    End If
-
-    base64Text = GitHubBase64AusJSON(jsonText)
+    base64Text = DownloadTabelleAlsText(ws)
 
     If Len(base64Text) = 0 Then
         Err.Raise vbObjectError + 1200, _
                   "LEG1_GitHub_Sync", _
-                  "Der GitHub-API-Antwort konnte kein " & _
-                  "Base64-Dateiinhalt entnommen werden."
+                  "Die GitHub-Base64-Datei konnte nicht gelesen werden."
     End If
 
     DownloadTabelleZuCode = Base64UTF8Dekodieren(base64Text)
@@ -456,45 +451,27 @@ End Function
 Private Function DownloadTabelleAlsText( _
     ByVal ws As Worksheet) As String
 
-    Dim jsonText As String
     Dim letzteZeile As Long
     Dim letzteSpalte As Long
     Dim r As Long
     Dim c As Long
     Dim v As String
-    Dim gefunden As Range
-    Dim suchBereich As Range
-    Dim firstRow As Long
-    Dim firstCol As Long
+    Dim textGesamt As String
 
-    ' ========================================================
-    ' Excel QueryTable kann eine JSON-Antwort je nach
-    ' Excel-Version unterschiedlich auf Zellen verteilen.
-    ' Deshalb wird NICHT mehr vorausgesetzt, dass der komplette
-    ' JSON-Text in A1 steht.
-    '
-    ' Zuerst versuchen wir A1. Das ist der schnelle Normalfall.
-    ' Falls Excel die JSON-Antwort aufgeteilt hat, suchen wir
-    ' gezielt nach dem Feld "content" und setzen den betreffenden
-    ' Tabellenbereich wieder zu einem Text zusammen.
-    ' ========================================================
-
-    On Error Resume Next
+    ' Normalfall: Die reine ASCII-Datei steht komplett in A1.
     v = CStr(ws.Range("A1").Value2)
-    On Error GoTo 0
 
     If Len(v) > 0 Then
-        If InStr(1, v, """content"":""", vbBinaryCompare) > 0 Then
-            DownloadTabelleAlsText = v
-            Exit Function
-        End If
+        DownloadTabelleAlsText = Replace(v, """", vbNullString)
+        DownloadTabelleAlsText = Replace(DownloadTabelleAlsText, vbCr, vbNullString)
+        DownloadTabelleAlsText = Replace(DownloadTabelleAlsText, vbLf, vbNullString)
+        DownloadTabelleAlsText = Replace(DownloadTabelleAlsText, " ", vbNullString)
+        DownloadTabelleAlsText = Replace(DownloadTabelleAlsText, vbTab, vbNullString)
+        Exit Function
     End If
 
-    ' --------------------------------------------------------
-    ' Begrenzten tatsächlich belegten Bereich ermitteln.
-    ' Kein UsedRange-Scanning und keine riesige Schleife.
-    ' --------------------------------------------------------
-
+    ' Fallback: Falls Excel die Datei auf mehrere Zellen verteilt,
+    ' werden alle belegten Zellen in Reihenfolge zusammengesetzt.
     letzteZeile = LetzteBelegteZeile(ws)
     letzteSpalte = LetzteBelegteSpalte(ws)
 
@@ -503,66 +480,22 @@ Private Function DownloadTabelleAlsText( _
         Exit Function
     End If
 
-    Set suchBereich = ws.Range( _
-        ws.Cells(1, 1), _
-        ws.Cells(letzteZeile, letzteSpalte))
-
-    ' --------------------------------------------------------
-    ' Das Feld "content" suchen.
-    ' --------------------------------------------------------
-
-    Set gefunden = suchBereich.Find( _
-        What:="content", _
-        After:=suchBereich.Cells(suchBereich.Cells.Count), _
-        LookIn:=xlValues, _
-        LookAt:=xlPart, _
-        SearchOrder:=xlByRows, _
-        SearchDirection:=xlNext, _
-        MatchCase:=False)
-
-    If gefunden Is Nothing Then
-        DownloadTabelleAlsText = vbNullString
-        Exit Function
-    End If
-
-    firstRow = gefunden.Row
-    firstCol = gefunden.Column
-
-    ' --------------------------------------------------------
-    ' Die gesamte betreffende Zeile wieder zusammensetzen.
-    ' Dadurch funktioniert es auch dann, wenn Excel die JSON-
-    ' Antwort an Kommas oder anderen Zeichen auf mehrere
-    ' QueryTable-Zellen verteilt hat.
-    ' --------------------------------------------------------
-
-    jsonText = vbNullString
-
-    For c = firstCol To letzteSpalte
-        v = CStr(ws.Cells(firstRow, c).Value2)
-        If Len(v) > 0 Then
-            jsonText = jsonText & v
-        End If
-    Next c
-
-    If InStr(1, jsonText, """content"":""", vbBinaryCompare) = 0 Then
-
-        ' ----------------------------------------------------
-        ' Fallback: Manche Excel-Versionen können das Feld
-        ' "content" in einer eigenen Zelle ablegen. Dann wird
-        ' ab der Fundstelle bis zum Zeilenende zusammengesetzt.
-        ' ----------------------------------------------------
-        jsonText = CStr(gefunden.Value2)
-
-        For c = gefunden.Column + 1 To letzteSpalte
-            v = CStr(ws.Cells(firstRow, c).Value2)
+    For r = 1 To letzteZeile
+        For c = 1 To letzteSpalte
+            v = CStr(ws.Cells(r, c).Value2)
             If Len(v) > 0 Then
-                jsonText = jsonText & v
+                textGesamt = textGesamt & v
             End If
         Next c
+    Next r
 
-    End If
+    textGesamt = Replace(textGesamt, """", vbNullString)
+    textGesamt = Replace(textGesamt, vbCr, vbNullString)
+    textGesamt = Replace(textGesamt, vbLf, vbNullString)
+    textGesamt = Replace(textGesamt, " ", vbNullString)
+    textGesamt = Replace(textGesamt, vbTab, vbNullString)
 
-    DownloadTabelleAlsText = jsonText
+    DownloadTabelleAlsText = textGesamt
 
 End Function
 
