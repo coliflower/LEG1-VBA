@@ -359,16 +359,6 @@ Private Function DownloadGitHubSource( _
         .RefreshStyle = xlOverwriteCells
         .AdjustColumnWidth = False
 
-        ' Die GitHub-API-Antwort ist JSON. Sie darf von Excel
-        ' nicht an Kommas/anderen Trennzeichen in viele Zellen
-        ' zerlegt werden. Die Antwort bleibt daher in A1.
-        .TextFileParseType = xlDelimited
-        .TextFileCommaDelimiter = False
-        .TextFileTabDelimiter = False
-        .TextFileSemicolonDelimiter = False
-        .TextFileSpaceDelimiter = False
-        .TextFileOtherDelimiter = Chr$(1)
-
         On Error Resume Next
 
         Err.Clear
