@@ -359,6 +359,16 @@ Private Function DownloadGitHubSource( _
         .RefreshStyle = xlOverwriteCells
         .AdjustColumnWidth = False
 
+        ' Die GitHub-API-Antwort ist JSON. Sie darf von Excel
+        ' nicht an Kommas/anderen Trennzeichen in viele Zellen
+        ' zerlegt werden. Die Antwort bleibt daher in A1.
+        .TextFileParseType = xlDelimited
+        .TextFileCommaDelimiter = False
+        .TextFileTabDelimiter = False
+        .TextFileSemicolonDelimiter = False
+        .TextFileSpaceDelimiter = False
+        .TextFileOtherDelimiter = Chr$(1)
+
         On Error Resume Next
 
         Err.Clear
@@ -456,40 +466,14 @@ End Function
 Private Function DownloadTabelleAlsText( _
     ByVal ws As Worksheet) As String
 
-    Dim lastRow As Long
-    Dim lastCol As Long
+    Dim jsonText As String
 
-    Dim r As Long
-    Dim c As Long
+    ' Die API-Antwort wird bewusst als ein einziger Textblock
+    ' aus A1 gelesen. Dadurch kann Excel keine riesige Schleife
+    ' ueber eine versehentlich aufgeteilte JSON-Tabelle erzeugen.
+    jsonText = CStr(ws.Range("A1").Value2)
 
-    Dim cellText As String
-    Dim result As String
-
-    lastRow = LetzteBelegteZeile(ws)
-    lastCol = LetzteBelegteSpalte(ws)
-
-    If lastRow < 1 Or lastCol < 1 Then
-        DownloadTabelleAlsText = vbNullString
-        Exit Function
-    End If
-
-    result = vbNullString
-
-    For r = 1 To lastRow
-
-        For c = 1 To lastCol
-
-            cellText = CStr(ws.Cells(r, c).Value)
-
-            If Len(cellText) > 0 Then
-                result = result & cellText
-            End If
-
-        Next c
-
-    Next r
-
-    DownloadTabelleAlsText = result
+    DownloadTabelleAlsText = jsonText
 
 End Function
 
