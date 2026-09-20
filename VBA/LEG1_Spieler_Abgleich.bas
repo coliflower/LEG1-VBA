@@ -4816,8 +4816,112 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
 
             key = SpielerKey(spieler)
 
+            wertGefunden = _
+                CollectionKeyExistiert( _
+                    spielerWerte, _
+                    key)
+
+            If wertGefunden Then
+
+                wert = CollectionWert( _
+                    spielerWerte, _
+                    key)
+
+                ' Den Quellenwert immer in die entsprechende
+                ' Dashboard-Zelle übernehmen.
+                wsDash.Cells( _
+                    i, _
+                    cDash).Value = wert
+
+                If NumerischerWert( _
+                        wert, _
+                        zahl) Then
+
+                    If zahl < schwelle Then
+
+                        If IstAktiv( _
+                                wsDash.Cells( _
+                                    i, _
+                                    DashboardSpalte(wsDash, LEG1_Basisdaten_Kopf)).Value) Then
+
+                            anzahlAktiveUnterSchwelle = _
+                                anzahlAktiveUnterSchwelle + 1
+
+                        End If
+
+                        wsDash.Cells( _
+                            i, _
+                            cDash).Font.Color = _
+                            RGB(255, 0, 0)
+
+                    Else
+
+                        wsDash.Cells( _
+                            i, _
+                            cDash).Font.ColorIndex = _
+                            xlAutomatic
+
+                    End If
+
+                Else
+
+                    wsDash.Cells( _
+                        i, _
+                        cDash).Font.ColorIndex = _
+                        xlAutomatic
+
+                End If
+
+            Else
+
+                ' Kein Quellwert: keine Wertübernahme und kein NOK.
+                wsDash.Cells( _
+                    i, _
+                    cDash).ClearContents
+
+            End If
+
+        End If
+
+    Next i
+
+    wsDash.Cells(1, cDash).Value = _
+        anzahlAktiveUnterSchwelle
+
+    ' Chests_NOK enthält die Anzahl der Chests-Spalten unterhalb
+    ' des Schwellenwerts für diesen Spieler.
+    For i = zeileSpieler1 To letzteZeileDash
+
+        spieler = SichererText( _
+            wsDash.Cells(i, cSpieler).Value)
+
+        If Len(spieler) > 0 Then
+
+            key = SpielerKey(spieler)
+
+            If CollectionKeyExistiert(spielerWerte, key) Then
+
+                wert = CollectionWert(spielerWerte, key)
+
+                If NumerischerWert(wert, zahl) Then
+
+                    If zahl < schwelle Then
+                        wsDash.Cells(i, cChestsNOK).Value = _
+                            CLng(wsDash.Cells(i, cChestsNOK).Value) + 1
+                    End If
+
+                End If
+
+            End If
+
+        End If
+
+    Next i
+
+End Sub
+
 ' ============================================================
-' RESTORED REQUIRED HELPERS
+' REQUIRED HELPERS
 ' ============================================================
 
 Private Sub ChestsSpalteRotMarkierungLoeschen( _
