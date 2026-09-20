@@ -2004,7 +2004,8 @@ Private Function ExcelNameBereinigen( _
     ByVal text As String) As String
 
     Dim i As Long
-    Dim ch As String    Dim ergebnis As String
+    Dim ch As String
+    Dim ergebnis As String
 
     text = Trim$(text)
 
