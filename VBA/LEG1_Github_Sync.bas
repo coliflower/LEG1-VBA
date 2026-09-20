@@ -290,28 +290,23 @@ Private Sub CodeModulErsetzen( _
     ByVal neuerCode As String)
 
     Dim anzahlZeilen As Long
-    Dim startPos As Long
-    Dim endPos As Long
-    Dim blockText As String
-    Dim blockLaenge As Long
-    Dim neueZeile As Long
-
-    Const MAX_BLOCKLAENGE As Long = 16000
+    Dim zeile As String
+    Dim pos As Long
+    Dim ende As Long
+    Dim insertZeile As Long
 
     On Error GoTo Fehler
 
-    ' Das VBA-Modul wird nicht mehr mit einem einzigen sehr
-    ' grossen AddFromString-Aufruf beschrieben.
+    ' WICHTIG:
+    ' Der VBA-Quelltext darf nicht in mehreren AddFromString-Bloecken
+    ' geschrieben werden, wenn ein Block mitten in einer VBA-Anweisung
+    ' endet. Genau das kann bei Zeilenfortsetzungen mit " _" dazu
+    ' fuehren, dass die Folgezeile von Excel als "ausserhalb einer
+    ' Prozedur" interpretiert wird.
     '
-    ' Excel/VBA kann bei sehr grossen Quelltexten zwar den
-    ' String selbst verarbeiten, AddFromString kann den Code
-    ' aber intern fehlerhaft in einzelne Codezeilen zerlegen.
-    ' Genau dadurch konnten nach der Synchronisierung scheinbar
-    ' "fehlende" Funktionen wie DashboardSpalte entstehen.
-    '
-    ' Deshalb wird der Quelltext in sicheren, zeilenbasierten
-    ' Bloecken eingefuegt. Es wird niemals mitten in einer
-    ' VBA-Codezeile getrennt.
+    ' Deshalb wird der Quelltext hier strikt ZEILE FUER ZEILE
+    ' eingefuegt. Dadurch bleiben auch mehrzeilige VBA-Anweisungen
+    ' mit " _" in ihrer urspruenglichen Reihenfolge erhalten.
 
     anzahlZeilen = vbComp.CodeModule.CountOfLines
 
@@ -322,60 +317,25 @@ Private Sub CodeModulErsetzen( _
     neuerCode = Replace(neuerCode, vbCrLf, vbLf)
     neuerCode = Replace(neuerCode, vbCr, vbLf)
 
-    startPos = 1
-    blockText = vbNullString
-    blockLaenge = 0
+    pos = 1
+    insertZeile = 1
 
-    Do While startPos <= Len(neuerCode)
+    Do While pos <= Len(neuerCode)
 
-        endPos = InStr(startPos, neuerCode, vbLf)
+        ende = InStr(pos, neuerCode, vbLf)
 
-        If endPos = 0 Then
-            neueZeile = Len(neuerCode) + 1
+        If ende = 0 Then
+            zeile = Mid$(neuerCode, pos)
+            pos = Len(neuerCode) + 1
         Else
-            neueZeile = endPos
+            zeile = Mid$(neuerCode, pos, ende - pos)
+            pos = ende + 1
         End If
 
-        If Len(blockText) > 0 Then
-
-            If blockLaenge + (neueZeile - startPos) + 2 > _
-               MAX_BLOCKLAENGE Then
-
-                vbComp.CodeModule.AddFromString blockText
-
-                blockText = vbNullString
-                blockLaenge = 0
-
-            End If
-
-        End If
-
-        If endPos = 0 Then
-
-            blockText = blockText & _
-                        Mid$(neuerCode, startPos)
-
-            blockLaenge = Len(blockText)
-
-            Exit Do
-
-        Else
-
-            blockText = blockText & _
-                        Mid$(neuerCode, startPos, _
-                             endPos - startPos + 1)
-
-            blockLaenge = Len(blockText)
-
-            startPos = endPos + 1
-
-        End If
+        vbComp.CodeModule.InsertLines insertZeile, zeile
+        insertZeile = insertZeile + 1
 
     Loop
-
-    If Len(blockText) > 0 Then
-        vbComp.CodeModule.AddFromString blockText
-    End If
 
     Exit Sub
 
@@ -383,7 +343,7 @@ Fehler:
 
     Err.Raise Err.Number, _
               "LEG1_GitHub_Sync / CodeModulErsetzen", _
-              "Fehler beim blockweisen Schreiben des VBA-Codes." & _
+              "Fehler beim zeilenweisen Schreiben des VBA-Codes." & _
               vbCrLf & _
               "Bereits eingefuegte Codezeilen: " & _
               CStr(vbComp.CodeModule.CountOfLines) & _
