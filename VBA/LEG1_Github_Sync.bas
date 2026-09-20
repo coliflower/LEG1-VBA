@@ -203,6 +203,8 @@ Public Sub LEG1_GitHub_Synchronisieren()
     Application.EnableEvents = oldEnableEvents
     Application.ScreenUpdating = oldScreenUpdating
 
+    LogTabelleAnzeigen wb
+
     MsgBox _
         "LEG1_Spieler_Abgleich wurde erfolgreich von GitHub aktualisiert." & _
         vbCrLf & vbCrLf & _
@@ -1066,6 +1068,28 @@ Private Function GetVBComponent( _
     Set GetVBComponent = comp
 
 End Function
+
+
+' ============================================================
+' LOG-TABELLE NACH ERFOLGREICHEM SYNC ANZEIGEN
+' ============================================================
+
+Private Sub LogTabelleAnzeigen(ByVal wb As Workbook)
+
+    Dim wsLog As Worksheet
+
+    On Error Resume Next
+
+    Set wsLog = wb.Worksheets("Log")
+
+    If Not wsLog Is Nothing Then
+        wsLog.Activate
+        wsLog.Range("A1").Select
+    End If
+
+    On Error GoTo 0
+
+End Sub
 
 
 ' ============================================================
