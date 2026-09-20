@@ -452,45 +452,35 @@ Private Function DownloadTabelleAlsText( _
     ByVal ws As Worksheet) As String
 
     Dim letzteZeile As Long
-    Dim letzteSpalte As Long
     Dim r As Long
-    Dim col As Long
     Dim v As Variant
     Dim textGesamt As String
 
-    ' Die Base64-Datei wird absichtlich in mehrere ASCII-Zeilen
-    ' mit jeweils maximal 30.000 Zeichen aufgeteilt.
-    ' Dadurch bleibt jede Excel-Zelle unter dem Excel-Limit
-    ' von 32.767 Zeichen.
+    ' Die GitHub-Base64-Datei wird mit 30.000 Zeichen pro
+    ' Zeile erzeugt. Excel importiert diese Zeilen in Spalte A.
     '
-    ' WICHTIG:
-    ' A1 darf hier NICHT als Sonderfall verwendet werden.
-    ' Auch wenn A1 belegt ist, koennen weitere Base64-Teile
-    ' in den folgenden Zeilen stehen.
+    ' Deshalb wird bewusst NUR Spalte A gelesen.
+    ' Dadurch vermeiden wir einen Scan ueber einen eventuell
+    ' kuenstlich vergroesserten UsedRange.
 
     letzteZeile = LetzteBelegteZeile(ws)
-    letzteSpalte = LetzteBelegteSpalte(ws)
 
-    If letzteZeile <= 0 Or letzteSpalte <= 0 Then
+    If letzteZeile <= 0 Then
         DownloadTabelleAlsText = vbNullString
         Exit Function
     End If
 
     For r = 1 To letzteZeile
 
-        For col = 1 To letzteSpalte
+        v = ws.Cells(r, 1).Value2
 
-            v = ws.Cells(r, col).Value2
+        If Not IsError(v) Then
 
-            If Not IsError(v) Then
-
-                If Len(CStr(v)) > 0 Then
-                    textGesamt = textGesamt & CStr(v)
-                End If
-
+            If Len(CStr(v)) > 0 Then
+                textGesamt = textGesamt & CStr(v)
             End If
 
-        Next col
+        End If
 
     Next r
 
