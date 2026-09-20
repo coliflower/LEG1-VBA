@@ -3614,14 +3614,6 @@ Private Sub T9SeitAktualisieren( _
         dashZeile, _
         cT9).Value
 
-    ' --------------------------------------------------------
-    ' T9_seit ist ein historischer Breakpoint.
-    '
-    ' Sobald ein Spieler erstmals T9 erreicht, wird das Datum
-    ' gesetzt. Danach bleibt es dauerhaft erhalten, auch wenn
-    ' der Spieler später wieder unter T9 fällt.
-    ' --------------------------------------------------------
-
     If IstEins(neuerT9) Then
 
         If IsError(alterT9) Then
@@ -3648,7 +3640,14 @@ Private Sub T9SeitAktualisieren( _
 
         End If
 
-    End If
+    ' --------------------------------------------------------
+    ' T9_seit ist ein historischer Breakpoint.
+    '
+    ' Sobald ein Spieler erstmals T9 erreicht, wird das Datum
+    ' gesetzt. Danach bleibt es dauerhaft erhalten, auch wenn
+    ' der Spieler später wieder unter T9 fällt.
+    ' --------------------------------------------------------
+
 
 End Sub
 
@@ -4527,3 +4526,866 @@ Private Sub ChestsSpaltenPruefen( _
             cBereichEnde) Then
 
         GoTo ChestsBeenden
+
+    End If
+
+    ' ------------------------------------------------------------
+    ' CHests_NOK UND ALTE MARKIERUNGEN ZURÜCKSETZEN
+    ' ------------------------------------------------------------
+
+    If letzteZeileDash >= zeileSpieler1 Then
+
+        wsDash.Range( _
+            wsDash.Cells(zeileSpieler1, cChestsNOK), _
+            wsDash.Cells(letzteZeileDash, cChestsNOK)).Value = 0
+
+        wsDash.Range( _
+            wsDash.Cells(zeileSpieler1, cChestsNOK), _
+            wsDash.Cells(letzteZeileDash, cChestsNOK)).Font.ColorIndex = _
+            xlAutomatic
+
+    End If
+
+    ' ------------------------------------------------------------
+    ' ALLE CHestS-SPALTEN DER QUELLDATEI PRÜFEN
+    ' ------------------------------------------------------------
+
+    If cBereichStart <= cBereichEnde Then
+
+        For c = cBereichStart To cBereichEnde
+
+            kopf = SichererText( _
+                wsDash.Cells( _
+                    zeileBezuege, _
+                    c).Value)
+
+            If ChestsDatumGueltig( _
+                    kopf, _
+                    datum) Then
+
+                nameText = _
+                    "Chests_" & _
+                    Format$( _
+                        datum, _
+                        "yyyymmdd")
+
+                ChestsNameSicherstellen _
+                    wsDash, _
+                    c, _
+                    zeileSummen, _
+                    nameText
+
+                ChestsSpalteImportierenUndPruefen _
+                    wsDash, _
+                    wbChests, _
+                    c, _
+                    datum, _
+                    zeileSchwelle2, _
+                    cSpieler, _
+                    cChestsNOK, _
+                    zeileSpieler1, _
+                    letzteZeileDash, _
+                    wsLog
+
+            Else
+
+                ChestsSpalteRotMarkierungLoeschen _
+                    wsDash, _
+                    c, _
+                    zeileSpieler1, _
+                    letzteZeileDash
+
+                wsDash.Cells(1, c).ClearContents
+
+            End If
+
+        Next c
+
+    End If
+
+ChestsBeenden:
+
+    If Not wbWarBereitsOffen Then
+
+        On Error Resume Next
+
+        wbChests.Close SaveChanges:=False
+
+        On Error GoTo 0
+
+    End If
+
+End Sub
+
+' ============================================================
+' CHESTS-ARBEITSMAPPE ÖFFNEN
+' ============================================================
+
+Private Function ChestsArbeitsmappeOeffnen( _
+    ByVal wsLog As Worksheet, _
+    ByRef warBereitsOffen As Boolean) As Workbook
+
+    Dim wb As Workbook
+    Dim dateiPfad As String
+
+    warBereitsOffen = False
+
+    On Error Resume Next
+
+    Set wb = Workbooks(CHESTS_DATEI)
+
+    On Error GoTo 0
+
+    If Not wb Is Nothing Then
+
+        warBereitsOffen = True
+
+        Set ChestsArbeitsmappeOeffnen = wb
+
+        Exit Function
+
+    End If
+
+    If Len(ThisWorkbook.Path) = 0 Then
+
+        LogEintrag _
+            wsLog, _
+            "CHESTS WARNUNG", _
+            "", _
+            "Die LEG1-Arbeitsmappe wurde noch nicht gespeichert. " & _
+            "Der Pfad zu '" & _
+            CHESTS_DATEI & _
+            "' kann nicht ermittelt werden."
+
+        Exit Function
+
+    End If
+
+    dateiPfad = _
+        ThisWorkbook.Path & _
+        Application.PathSeparator & _
+        CHESTS_DATEI
+
+    If Dir(dateiPfad) = "" Then
+
+        LogEintrag _
+            wsLog, _
+            "CHESTS WARNUNG", _
+            "", _
+            "Die Datei '" & _
+            CHESTS_DATEI & _
+            "' wurde nicht gefunden: " & _
+            dateiPfad
+
+        Exit Function
+
+    End If
+
+    On Error GoTo OeffnenFehler
+
+    Set wb = Workbooks.Open( _
+        FileName:=dateiPfad, _
+        UpdateLinks:=0, _
+        ReadOnly:=True)
+
+    Set ChestsArbeitsmappeOeffnen = wb
+
+    Exit Function
+
+OeffnenFehler:
+
+    LogEintrag _
+        wsLog, _
+        "CHESTS WARNUNG", _
+        "", _
+        "Die Datei '" & _
+        CHESTS_DATEI & _
+        "' konnte nicht geöffnet werden. Fehler " & _
+        CStr(Err.Number) & _
+        ": " & _
+        Err.Description
+
+    Set ChestsArbeitsmappeOeffnen = Nothing
+
+End Function
+
+' ============================================================
+' CHESTS-SPALTE IMPORTIEREN UND PRÜFEN
+' ============================================================
+
+Private Sub ChestsSpalteImportierenUndPruefen( _
+    ByVal wsDash As Worksheet, _
+    ByVal wbChests As Workbook, _
+    ByVal cDash As Long, _
+    ByVal datum As Date, _
+    ByVal zeileSchwelle2 As Long, _
+    ByVal cSpieler As Long, _
+    ByVal cChestsNOK As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal letzteZeileDash As Long, _
+    ByVal wsLog As Worksheet)
+
+    Dim wsQuelle As Worksheet
+
+    Dim sheetName As String
+    Dim letzteZeileQuelle As Long
+    Dim i As Long
+
+    Dim spieler As String
+    Dim key As String
+    Dim wert As Variant
+    Dim zahl As Double
+    Dim schwelle As Double
+
+    Dim spielerWerte As Collection
+
+    Dim anzahlAktiveUnterSchwelle As Long
+    Dim wertGefunden As Boolean
+
+    sheetName = Format$( _
+        datum, _
+        "yyyymmdd")
+
+    Set wsQuelle = Nothing
+
+    On Error Resume Next
+
+    Set wsQuelle = _
+        wbChests.Worksheets(sheetName)
+
+    On Error GoTo 0
+
+    If wsQuelle Is Nothing Then
+
+        Err.Raise 1004, , _
+            "Das Chests-Quellblatt '" & _
+            sheetName & _
+            "' wurde in '" & _
+            CHESTS_DATEI & _
+            "' nicht gefunden."
+
+    End If
+
+    If Not NumerischerWert( _
+            wsDash.Cells( _
+                zeileSchwelle2, _
+                cDash).Value, _
+            schwelle) Then
+
+        Err.Raise 1004, , _
+            "Der Schwellenwert in " & _
+            wsDash.Cells( _
+                zeileSchwelle2, _
+                cDash).Address(False, False) & _
+            " ist kein numerischer Wert."
+
+    End If
+
+    ChestsSpalteRotMarkierungLoeschen _
+        wsDash, _
+        cDash, _
+        zeileSpieler1, _
+        letzteZeileDash
+
+    Set spielerWerte = New Collection
+
+    letzteZeileQuelle = _
+        wsQuelle.Cells( _
+            wsQuelle.Rows.Count, _
+            CHESTS_SPIELER_SPALTE).End(xlUp).Row
+
+    If letzteZeileQuelle >= CHESTS_DATENSTART Then
+
+        For i = CHESTS_DATENSTART To letzteZeileQuelle
+
+            spieler = SichererText( _
+                wsQuelle.Cells( _
+                    i, _
+                    CHESTS_SPIELER_SPALTE).Value)
+
+            If Len(spieler) > 0 Then
+
+                key = SpielerKey(spieler)
+
+                If CollectionKeyExistiert( _
+                        spielerWerte, _
+                        key) Then
+
+                    LogEintrag _
+                        wsLog, _
+                        "DUPLIKAT CHESTS", _
+                        spieler, _
+                        "Spieler kommt mehrfach im Quellblatt '" & _
+                        sheetName & _
+                        "' vor. Der erste Wert wird verwendet."
+
+                Else
+
+                    wert = _
+                        wsQuelle.Cells( _
+                            i, _
+                            CHESTS_WERT_SPALTE).Value
+
+                    spielerWerte.Add _
+                        wert, _
+                        key
+
+                End If
+            End If
+
+        Next i
+
+    End If
+
+    For i = zeileSpieler1 To letzteZeileDash
+
+        spieler = SichererText( _
+            wsDash.Cells( _
+                i, _
+                cSpieler).Value)
+
+        If Len(spieler) > 0 Then
+
+            key = SpielerKey(spieler)
+
+            wertGefunden = _
+                CollectionKeyExistiert( _
+                    spielerWerte, _
+                    key)
+
+            If wertGefunden Then
+
+                wert = CollectionWert( _
+                    spielerWerte, _
+                    key)
+
+                ' Den Quellenwert immer in die entsprechende
+                ' Dashboard-Zelle übernehmen.
+                wsDash.Cells( _
+                    i, _
+                    cDash).Value = wert
+
+                If NumerischerWert( _
+                        wert, _
+                        zahl) Then
+
+                    If zahl < schwelle Then
+
+                        If IstAktiv( _
+                                wsDash.Cells( _
+                                    i, _
+                                    DashboardSpalte(wsDash, LEG1_Basisdaten_Kopf)).Value) Then
+
+                            anzahlAktiveUnterSchwelle = _
+                                anzahlAktiveUnterSchwelle + 1
+
+                        End If
+
+                        wsDash.Cells( _
+                            i, _
+                            cDash).Font.Color = _
+                            RGB(255, 0, 0)
+
+                    Else
+
+                        wsDash.Cells( _
+                            i, _
+                            cDash).Font.ColorIndex = _
+                            xlAutomatic
+
+                    End If
+
+                Else
+
+                    wsDash.Cells( _
+                        i, _
+                        cDash).Font.ColorIndex = _
+                        xlAutomatic
+
+                End If
+
+            Else
+
+                ' Kein Quellwert: keine Wertübernahme und kein NOK.
+                wsDash.Cells( _
+                    i, _
+                    cDash).ClearContents
+
+            End If
+
+        End If
+
+    Next i
+
+    wsDash.Cells(1, cDash).Value = _
+        anzahlAktiveUnterSchwelle
+
+    ' Chests_NOK enthält die Anzahl der Chests-Spalten unterhalb
+    ' des Schwellenwerts für diesen Spieler.
+    For i = zeileSpieler1 To letzteZeileDash
+
+        spieler = SichererText( _
+            wsDash.Cells(i, cSpieler).Value)
+
+        If Len(spieler) > 0 Then
+
+            key = SpielerKey(spieler)
+
+            If CollectionKeyExistiert(spielerWerte, key) Then
+
+                wert = CollectionWert(spielerWerte, key)
+
+                If NumerischerWert(wert, zahl) Then
+
+                    If zahl < schwelle Then
+                        wsDash.Cells(i, cChestsNOK).Value = _
+                            CLng(wsDash.Cells(i, cChestsNOK).Value) + 1
+                    End If
+
+                End If
+
+            End If
+
+        End If
+
+    Next i
+
+End Sub
+
+' ============================================================
+' REQUIRED HELPERS
+' ============================================================
+
+Private Sub ChestsSpalteRotMarkierungLoeschen( _
+    ByVal ws As Worksheet, _
+    ByVal cDash As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal letzteZeileDash As Long)
+
+    If cDash <= 0 Then Exit Sub
+    If letzteZeileDash < zeileSpieler1 Then Exit Sub
+
+    ws.Range( _
+        ws.Cells(zeileSpieler1, cDash), _
+        ws.Cells(letzteZeileDash, cDash)).Font.ColorIndex = _
+        xlAutomatic
+
+End Sub
+
+Private Sub ChestsNOKAlleSpielerZuruecksetzen( _
+    ByVal wsDash As Worksheet, _
+    ByVal cChestsNOK As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal letzteZeileDash As Long)
+
+    If cChestsNOK <= 0 Then Exit Sub
+    If letzteZeileDash < zeileSpieler1 Then Exit Sub
+
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cChestsNOK), _
+        wsDash.Cells(letzteZeileDash, cChestsNOK)).Value = 0
+
+    wsDash.Range( _
+        wsDash.Cells(zeileSpieler1, cChestsNOK), _
+        wsDash.Cells(letzteZeileDash, cChestsNOK)).Font.ColorIndex = _
+        xlAutomatic
+
+End Sub
+
+Private Function ChestsDatumGueltig( _
+    ByVal text As String, _
+    ByRef datum As Date) As Boolean
+
+    ChestsDatumGueltig = False
+
+    text = Trim$(text)
+
+    If Len(text) <> 8 Then Exit Function
+    If Not IsNumeric(text) Then Exit Function
+
+    On Error GoTo Fehler
+
+    datum = DateSerial( _
+        CLng(Left$(text, 4)), _
+        CLng(Mid$(text, 5, 2)), _
+        CLng(Right$(text, 2)))
+
+    If Format$( _
+            datum, _
+            "yyyymmdd") <> text Then
+
+        ChestsDatumGueltig = False
+        Exit Function
+
+    End If
+
+    ChestsDatumGueltig = True
+
+    Exit Function
+
+Fehler:
+
+    ChestsDatumGueltig = False
+
+End Function
+
+Private Sub ChestsNameSicherstellen( _
+    ByVal wsDash As Worksheet, _
+    ByVal c As Long, _
+    ByVal zeileSummen As Long, _
+    ByVal nameText As String)
+
+    Dim nm As name
+    Dim rngZiel As Range
+    Dim rngAlt As Range
+    Dim zielBezug As String
+    Dim errNum As Long
+    Dim errDesc As String
+
+    Set rngZiel = _
+        wsDash.Cells( _
+            zeileSummen, _
+            c)
+
+    zielBezug = "=" & _
+        rngZiel.Address( _
+            RowAbsolute:=True, _
+            ColumnAbsolute:=True, _
+            ReferenceStyle:=xlA1, _
+            External:=True)
+
+    Set nm = Nothing
+
+    On Error Resume Next
+
+    Set nm = ThisWorkbook.Names(nameText)
+
+    If nm Is Nothing Then
+        Set nm = wsDash.Names(nameText)
+    End If
+
+    On Error GoTo 0
+
+    If nm Is Nothing Then
+
+        On Error GoTo NameErstellenFehler
+
+        ThisWorkbook.Names.Add _
+            name:=nameText, _
+            RefersTo:=zielBezug
+
+        On Error GoTo 0
+
+        Exit Sub
+
+    End If
+
+    Set rngAlt = Nothing
+
+    On Error Resume Next
+
+    Set rngAlt = nm.RefersToRange
+
+    On Error GoTo 0
+
+    If rngAlt Is Nothing Then
+
+        On Error GoTo NameKorrigierenFehler
+
+        nm.RefersTo = zielBezug
+
+        On Error GoTo 0
+
+        Exit Sub
+
+    End If
+
+    If rngAlt.Parent Is wsDash Then
+
+        If rngAlt.Row = rngZiel.Row And _
+           rngAlt.Column = rngZiel.Column Then
+
+            Exit Sub
+
+        End If
+
+    End If
+
+    On Error GoTo NameKorrigierenFehler
+
+    nm.RefersTo = zielBezug
+
+    On Error GoTo 0
+
+    Exit Sub
+
+NameErstellenFehler:
+
+    errNum = Err.Number
+    errDesc = Err.Description
+
+    On Error GoTo 0
+
+    Err.Raise 1004, _
+        "ChestsNameSicherstellen", _
+        "Der definierte Name '" & _
+        nameText & _
+        "' konnte nicht erstellt werden." & _
+        vbCrLf & _
+        "Fehler " & _
+        CStr(errNum) & _
+        ": " & _
+        errDesc
+
+NameKorrigierenFehler:
+
+    errNum = Err.Number
+    errDesc = Err.Description
+
+    On Error GoTo 0
+
+    Err.Raise 1004, _
+        "ChestsNameSicherstellen", _
+        "Der definierte Name '" & _
+        nameText & _
+        "' konnte nicht korrigiert werden." & _
+        vbCrLf & _
+        "Fehler " & _
+        CStr(errNum) & _
+        ": " & _
+        errDesc
+
+End Sub
+
+Private Sub AktiveSpielerZaehlenUndAnzeigen( _
+    ByVal ws As Worksheet, _
+    ByVal cBasisdaten As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal letzteZeile As Long)
+
+    Dim i As Long
+    Dim anzahlAktive As Long
+
+    If cBasisdaten <= 0 Then Exit Sub
+
+    If letzteZeile < zeileSpieler1 Then
+
+        With ws.Cells(1, cBasisdaten)
+            .Value = 0
+            .Font.Color = RGB(255, 0, 0)
+        End With
+
+        Exit Sub
+
+    End If
+
+    For i = zeileSpieler1 To letzteZeile
+
+        If IstAktiv(ws.Cells(i, cBasisdaten).Value) Then
+            anzahlAktive = anzahlAktive + 1
+        End If
+
+    Next i
+
+    With ws.Cells(1, cBasisdaten)
+        .Value = anzahlAktive
+        .Font.Color = RGB(255, 0, 0)
+    End With
+
+End Sub
+
+Private Sub DashboardSortieren( _
+    ByVal ws As Worksheet, _
+    ByVal cSpieler As Long, _
+    ByVal cBasisdaten As Long, _
+    ByVal letzteZeile As Long, _
+    ByVal zeileSpieler1 As Long, _
+    ByVal cLetzterNOK As Long)
+
+    Dim cStart As Long
+    Dim cEnde As Long
+
+    If letzteZeile < zeileSpieler1 Then Exit Sub
+
+    If cSpieler <= 0 Then Exit Sub
+    If cBasisdaten <= 0 Then Exit Sub
+    If cLetzterNOK <= 0 Then Exit Sub
+
+    cStart = cSpieler
+    cEnde = cLetzterNOK
+
+    If cEnde < cStart Then Exit Sub
+
+    With ws.Range( _
+            ws.Cells(zeileSpieler1, cStart), _
+            ws.Cells(letzteZeile, cEnde))
+
+        .Sort _
+            key1:=ws.Range( _
+                ws.Cells(zeileSpieler1, cBasisdaten), _
+                ws.Cells(letzteZeile, cBasisdaten)), _
+            Order1:=xlDescending, _
+            header:=xlNo, _
+            MatchCase:=False, _
+            Orientation:=xlTopToBottom, _
+            DataOption1:=xlSortNormal
+    End With
+
+End Sub
+
+Private Sub AutofilterZuruecksetzen( _
+    ByVal ws As Worksheet)
+
+    On Error Resume Next
+
+    If ws.AutoFilterMode Then
+
+        If ws.FilterMode Then
+            ws.ShowAllData
+        End If
+
+    End If
+
+    On Error GoTo 0
+
+End Sub
+
+Private Function LogBlattErstellen() As Worksheet
+
+    Dim ws As Worksheet
+
+    On Error Resume Next
+
+    Set ws = _
+        ThisWorkbook.Worksheets("LEG1_Log")
+
+    On Error GoTo 0
+
+    If ws Is Nothing Then
+
+        Set ws = _
+            ThisWorkbook.Worksheets.Add( _
+                After:=ThisWorkbook.Worksheets( _
+                    ThisWorkbook.Worksheets.Count))
+
+        ws.name = "LEG1_Log"
+
+        ws.Cells(1, 1).Value = "Zeit"
+        ws.Cells(1, 2).Value = "Typ"
+        ws.Cells(1, 3).Value = "Spieler"
+        ws.Cells(1, 4).Value = "Information"
+
+    End If
+
+    Set LogBlattErstellen = ws
+
+End Function
+
+Private Sub LogEintrag( _
+    ByVal wsLog As Worksheet, _
+    ByVal typ As String, _
+    ByVal spieler As String, _
+    ByVal information As String)
+
+    Dim zeile As Long
+
+    If wsLog Is Nothing Then Exit Sub
+
+    zeile = _
+        wsLog.Cells( _
+            wsLog.Rows.Count, _
+            1).End(xlUp).Row + 1
+
+    wsLog.Cells(zeile, 1).Value = GetUTCNow()
+    wsLog.Cells(zeile, 2).Value = typ
+    wsLog.Cells(zeile, 3).Value = spieler
+    wsLog.Cells(zeile, 4).Value = information
+
+End Sub
+
+Private Sub SicherungErstellen( _
+    ByVal wsLog As Worksheet)
+
+    Dim backupPfad As String
+    Dim backupOrdner As String
+    Dim dateiname As String
+
+    Dim errNum As Long
+    Dim errDesc As String
+
+    On Error GoTo Fehler
+
+    If Len(ThisWorkbook.Path) = 0 Then
+
+        LogEintrag _
+            wsLog, _
+            "SICHERUNG WARNUNG", _
+            "", _
+            "Die Arbeitsmappe wurde noch nicht gespeichert. " & _
+            "Es wurde keine Sicherung erstellt."
+
+        Exit Sub
+
+    End If
+
+    backupOrdner = _
+        ThisWorkbook.Path & _
+        Application.PathSeparator & _
+        "Backup"
+
+    If Dir( _
+            backupOrdner, _
+            vbDirectory) = "" Then
+
+        MkDir backupOrdner
+
+    End If
+
+    dateiname = _
+        "LEG1_Backup_" & _
+        Format$( _
+            GetUTCNow(), _
+            "yyyymmdd_hhnnss") & _
+        ".xlsm"
+
+    backupPfad = _
+        backupOrdner & _
+        Application.PathSeparator & _
+        dateiname
+
+    ThisWorkbook.SaveCopyAs backupPfad
+
+    LogEintrag _
+        wsLog, _
+        "SICHERUNG", _
+        "", _
+        "Sicherung erstellt: " & _
+        dateiname
+
+    Exit Sub
+
+Fehler:
+
+    errNum = Err.Number
+    errDesc = Err.Description
+
+    On Error Resume Next
+
+    LogEintrag _
+        wsLog, _
+        "SICHERUNG WARNUNG", _
+        "", _
+        "Sicherung konnte nicht erstellt werden. Fehler " & _
+        CStr(errNum) & _
+        ": " & _
+        errDesc
+
+    On Error GoTo 0
+
+End Sub
+
+Private Function GetUTCNow() As Date
+
+    GetUTCNow = Now()
+
+End Function
