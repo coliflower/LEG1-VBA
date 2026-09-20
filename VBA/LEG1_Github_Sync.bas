@@ -457,11 +457,110 @@ Private Function DownloadTabelleAlsText( _
     ByVal ws As Worksheet) As String
 
     Dim jsonText As String
+    Dim letzteZeile As Long
+    Dim letzteSpalte As Long
+    Dim r As Long
+    Dim c As Long
+    Dim v As String
+    Dim gefunden As Range
+    Dim suchBereich As Range
+    Dim firstRow As Long
+    Dim firstCol As Long
 
-    ' Die API-Antwort wird bewusst als ein einziger Textblock
-    ' aus A1 gelesen. Dadurch kann Excel keine riesige Schleife
-    ' ueber eine versehentlich aufgeteilte JSON-Tabelle erzeugen.
-    jsonText = CStr(ws.Range("A1").Value2)
+    ' ========================================================
+    ' Excel QueryTable kann eine JSON-Antwort je nach
+    ' Excel-Version unterschiedlich auf Zellen verteilen.
+    ' Deshalb wird NICHT mehr vorausgesetzt, dass der komplette
+    ' JSON-Text in A1 steht.
+    '
+    ' Zuerst versuchen wir A1. Das ist der schnelle Normalfall.
+    ' Falls Excel die JSON-Antwort aufgeteilt hat, suchen wir
+    ' gezielt nach dem Feld "content" und setzen den betreffenden
+    ' Tabellenbereich wieder zu einem Text zusammen.
+    ' ========================================================
+
+    On Error Resume Next
+    v = CStr(ws.Range("A1").Value2)
+    On Error GoTo 0
+
+    If Len(v) > 0 Then
+        If InStr(1, v, """content"":""", vbBinaryCompare) > 0 Then
+            DownloadTabelleAlsText = v
+            Exit Function
+        End If
+    End If
+
+    ' --------------------------------------------------------
+    ' Begrenzten tatsächlich belegten Bereich ermitteln.
+    ' Kein UsedRange-Scanning und keine riesige Schleife.
+    ' --------------------------------------------------------
+
+    letzteZeile = LetzteBelegteZeile(ws)
+    letzteSpalte = LetzteBelegteSpalte(ws)
+
+    If letzteZeile <= 0 Or letzteSpalte <= 0 Then
+        DownloadTabelleAlsText = vbNullString
+        Exit Function
+    End If
+
+    Set suchBereich = ws.Range( _
+        ws.Cells(1, 1), _
+        ws.Cells(letzteZeile, letzteSpalte))
+
+    ' --------------------------------------------------------
+    ' Das Feld "content" suchen.
+    ' --------------------------------------------------------
+
+    Set gefunden = suchBereich.Find( _
+        What:="content", _
+        After:=suchBereich.Cells(suchBereich.Cells.Count), _
+        LookIn:=xlValues, _
+        LookAt:=xlPart, _
+        SearchOrder:=xlByRows, _
+        SearchDirection:=xlNext, _
+        MatchCase:=False)
+
+    If gefunden Is Nothing Then
+        DownloadTabelleAlsText = vbNullString
+        Exit Function
+    End If
+
+    firstRow = gefunden.Row
+    firstCol = gefunden.Column
+
+    ' --------------------------------------------------------
+    ' Die gesamte betreffende Zeile wieder zusammensetzen.
+    ' Dadurch funktioniert es auch dann, wenn Excel die JSON-
+    ' Antwort an Kommas oder anderen Zeichen auf mehrere
+    ' QueryTable-Zellen verteilt hat.
+    ' --------------------------------------------------------
+
+    jsonText = vbNullString
+
+    For c = firstCol To letzteSpalte
+        v = CStr(ws.Cells(firstRow, c).Value2)
+        If Len(v) > 0 Then
+            jsonText = jsonText & v
+        End If
+    Next c
+
+    If InStr(1, jsonText, """content"":""", vbBinaryCompare) = 0 Then
+
+        ' ----------------------------------------------------
+        ' Fallback: Manche Excel-Versionen können das Feld
+        ' "content" in einer eigenen Zelle ablegen. Dann wird
+        ' ab der Fundstelle bis zum Zeilenende zusammengesetzt.
+        ' ----------------------------------------------------
+        jsonText = CStr(gefunden.Value2)
+
+        For c = gefunden.Column + 1 To letzteSpalte
+            v = CStr(ws.Cells(firstRow, c).Value2)
+            If Len(v) > 0 Then
+                jsonText = jsonText & v
+            End If
+        Next c
+
+    End If
 
     DownloadTabelleAlsText = jsonText
 
