@@ -3584,6 +3584,14 @@ Private Sub T9SeitAktualisieren( _
         dashZeile, _
         cT9).Value
 
+    ' --------------------------------------------------------
+    ' T9_seit ist ein historischer Breakpoint.
+    '
+    ' Sobald ein Spieler erstmals T9 erreicht, wird das Datum
+    ' gesetzt. Danach bleibt es dauerhaft erhalten, auch wenn
+    ' der Spieler später wieder unter T9 fällt.
+    ' --------------------------------------------------------
+
     If IstEins(neuerT9) Then
 
         If IsError(alterT9) Then
@@ -3609,11 +3617,6 @@ Private Sub T9SeitAktualisieren( _
                 "dd.mm.yyyy hh:mm"
 
         End If
-    Else
-
-        wsDash.Cells( _
-            dashZeile, _
-            cT9Seit).ClearContents
 
     End If
 
