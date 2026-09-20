@@ -692,14 +692,14 @@ Private Function Base64Dekodieren( _
         End If
 
         output(dataLength) = _
-            CByte((a * 64) + (b \ 4))
+            CByte((a * 4) + (b \ 16))
 
         dataLength = dataLength + 1
 
         If i + 2 <= n Then
             If Mid$(base64Text, i + 2, 1) <> "=" Then
                 output(dataLength) = _
-                    CByte(((b And 3) * 64) + (c \ 16))
+                    CByte(((b And 15) * 16) + (c \ 4))
                 dataLength = dataLength + 1
             End If
         End If
@@ -707,7 +707,7 @@ Private Function Base64Dekodieren( _
         If i + 3 <= n Then
             If Mid$(base64Text, i + 3, 1) <> "=" Then
                 output(dataLength) = _
-                    CByte(((c And 15) * 16) + d)
+                    CByte(((c And 3) * 64) + d)
                 dataLength = dataLength + 1
             End If
         End If
