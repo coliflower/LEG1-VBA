@@ -4145,21 +4145,12 @@ Private Sub CarterBereichPruefen( _
 
                 Else
 
-                    ' Nicht numerische / leere Werte erreichen
-                    ' den Schwellenwert nicht und werden daher
-                    ' als NOK gezählt und rot markiert.
-                    anzahlUnterSchwelle = _
-                        anzahlUnterSchwelle + 1
-
-                    If spielerAktiv Then
-                        wsDash.Cells(1, c).Value = _
-                            CLng(wsDash.Cells(1, c).Value) + 1
-                    End If
-
+                    ' Leere oder nicht numerische Werte werden nicht bewertet.
+                    ' Sie sind weder NOK noch werden sie rot markiert.
                     wsDash.Cells( _
                         i, _
-                        c).Font.Color = _
-                        RGB(255, 0, 0)
+                        c).Font.ColorIndex = _
+                        xlAutomatic
 
                 End If
 
