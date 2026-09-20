@@ -1,0 +1,32 @@
+name: Update VBA Base64 transport
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'VBA/LEG1_Spieler_Abgleich.bas'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-base64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create ASCII Base64 copy
+        run: |
+          base64 -w 0 VBA/LEG1_Spieler_Abgleich.bas > VBA/LEG1_Spieler_Abgleich.b64
+
+      - name: Commit Base64 copy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VBA/LEG1_Spieler_Abgleich.b64
+          git diff --cached --quiet && exit 0
+          git commit -m "Update VBA Base64 transport copy"
+          git push
