@@ -4248,32 +4248,37 @@ Private Sub ChestsSpaltenPruefen( _
     Dim cBereichStart As Long
     Dim cBereichEnde As Long
     Dim c As Long
-    Dim cVorher As Long
-    Dim cNachher As Long
-    Dim cEinfügen As Long
     Dim cSuche As Long
+    Dim cEinfügen As Long
+    Dim cVorlage As Long
 
     Dim kopf As String
     Dim datum As Date
-    Dim datumText As String
-    Dim nameText As String
+    Dim datumGefunden As Date
     Dim quellSheetName As String
     Dim quellDatum As Date
+    Dim nameText As String
 
     Dim wbChests As Workbook
     Dim wbWarBereitsOffen As Boolean
     Dim wsQuelle As Worksheet
-    Dim datumGefunden As Boolean
-    Dim vorhandeneChestsSpalten As Boolean
+    Dim datumVorhanden As Boolean
 
     If cBasisdaten <= 0 Then Exit Sub
 
-    cChestsNOK = DashboardSpalte(wsDash, CHESTS_NOK_Kopf)
+    cChestsNOK = DashboardSpalte( _
+        wsDash, _
+        CHESTS_NOK_Kopf)
+
     If cChestsNOK <= 0 Then Exit Sub
 
     If zeileSummen <= 0 Then Exit Sub
     If zeileSchwelle2 <= 0 Then Exit Sub
     If zeileBezuege <= 0 Then Exit Sub
+
+    ' ------------------------------------------------------------
+    ' QUELLDATEI ÖFFNEN
+    ' ------------------------------------------------------------
 
     Set wbChests = ChestsArbeitsmappeOeffnen( _
         wsLog, _
@@ -4289,14 +4294,14 @@ Private Sub ChestsSpaltenPruefen( _
     End If
 
     ' ------------------------------------------------------------
-    ' CHESTS-BEREICH VOLLSTÄNDIG DYNAMISCH AUFBAUEN
+    ' CHESTS-BEREICH 100 % DYNAMISCH ERWEITERN
     '
-    ' Jedes gültige Datumsblatt der Quelldatei muss als eigene
-    ' Dashboard-Spalte vorhanden sein.
+    ' Jedes Arbeitsblatt mit einem gültigen Datum im Format
+    ' JJJJMMTT wird als Chests-Datenspalte erkannt.
     '
     ' Bereits vorhandene historische Spalten bleiben erhalten.
-    ' Neue Quellblätter werden automatisch chronologisch vor
-    ' Chests_NOK eingefügt.
+    ' Neue Blätter werden automatisch chronologisch in den
+    ' Bereich vor Chests_NOK eingefügt.
     ' ------------------------------------------------------------
 
     For Each wsQuelle In wbChests.Worksheets
@@ -4307,32 +4312,43 @@ Private Sub ChestsSpaltenPruefen( _
                 quellSheetName, _
                 quellDatum) Then
 
+            ' Aktuelle Grenzen des Chests-Bereichs ausschließlich
+            ' über den vorhandenen _NOK-Marker bestimmen.
             cChestsNOK = DashboardSpalte( _
                 wsDash, _
                 CHESTS_NOK_Kopf)
 
-            cBereichStart = cChestsNOK
-            cBereichStart = cBereichStart - 1
+            If Not BereichsGrenzenFuerNOKMarkerErmitteln( _
+                    wsDash, _
+                    cBasisdaten, _
+                    cChestsNOK, _
+                    cBereichStart, _
+                    cBereichEnde) Then
 
-            If cBereichStart > 0 Then
+                cBereichStart = cChestsNOK
+                cBereichEnde = cChestsNOK - 1
 
-                datumGefunden = False
+            End If
 
-                For cSuche = 1 To cBereichStart
+            datumVorhanden = False
+
+            If cBereichStart <= cBereichEnde Then
+
+                For cSuche = cBereichStart To cBereichEnde
 
                     If ChestsDatumGueltig( _
                             SichererText( _
                                 wsDash.Cells( _
                                     zeileBezuege, _
                                     cSuche).Value), _
-                            datum) Then
+                            datumGefunden) Then
 
                         If Format$( _
-                                datum, _
-                                "yyyymmdd") = _ 
+                                datumGefunden, _
+                                "yyyymmdd") = _
                            quellSheetName Then
 
-                            datumGefunden = True
+                            datumVorhanden = True
                             Exit For
 
                         End If
@@ -4341,22 +4357,29 @@ Private Sub ChestsSpaltenPruefen( _
 
                 Next cSuche
 
-                If Not datumGefunden Then
+            End If
 
-                    cEinfügen = cChestsNOK
+            If Not datumVorhanden Then
 
-                    For cSuche = cBereichStart To 1 Step -1
+                ' Standardmäßig hinter die letzte vorhandene
+                ' Chests-Spalte und damit direkt vor Chests_NOK.
+                cEinfügen = cChestsNOK
+
+                ' Gibt es ein späteres Datum, wird davor eingefügt.
+                If cBereichStart <= cBereichEnde Then
+
+                    For cSuche = cBereichStart To cBereichEnde
 
                         If ChestsDatumGueltig( _
                                 SichererText( _
                                     wsDash.Cells( _
                                         zeileBezuege, _
                                         cSuche).Value), _
-                                datum) Then
+                                datumGefunden) Then
 
-                            If datum < quellDatum Then
+                            If quellDatum < datumGefunden Then
 
-                                cEinfügen = cSuche + 1
+                                cEinfügen = cSuche
                                 Exit For
 
                             End If
@@ -4365,99 +4388,87 @@ Private Sub ChestsSpaltenPruefen( _
 
                     Next cSuche
 
-                    ' Wenn kein früheres Datum vorhanden ist, wird
-                    ' vor der ersten vorhandenen Chests-Spalte
-                    ' eingefügt.
-                    If cEinfügen = cChestsNOK Then
+                End If
 
-                        For cSuche = 1 To cBereichStart
+                ' Eine vorhandene Chests-Spalte als Vorlage für
+                ' Formatierung und Schwellenwert bestimmen.
+                cVorlage = 0
 
-                            If ChestsDatumGueltig( _
-                                    SichererText( _
-                                        wsDash.Cells( _
-                                            zeileBezuege, _
-                                            cSuche).Value), _
-                                    datum) Then
+                If cBereichStart <= cBereichEnde Then
 
-                                cEinfügen = cSuche
-                                Exit For
+                    If cEinfügen > cBereichStart Then
 
-                            End If
+                        cVorlage = cEinfügen - 1
 
-                        Next cSuche
+                    Else
+
+                        cVorlage = cBereichStart
 
                     End If
 
-                    ' ------------------------------------------------
-                    ' NEUE SPALTE EINFÜGEN
-                    '
-                    ' Die Nachbarspalte liefert Formatierung und
-                    ' Schwellenwert. Spielerwerte und alte Zählung
-                    ' werden anschließend entfernt.
-                    ' ------------------------------------------------
+                End If
 
-                    cVorher = cEinfügen - 1
-                    cNachher = cEinfügen
+                ' Neue Spalte unmittelbar vor Chests_NOK bzw.
+                ' an der chronologisch passenden Stelle einfügen.
+                wsDash.Columns(cEinfügen).Insert _
+                    Shift:=xlToRight, _
+                    CopyOrigin:=xlFormatFromLeftOrAbove
 
-                    wsDash.Columns(cEinfügen).Insert _
-                        Shift:=xlToRight, _
-                        CopyOrigin:=xlFormatFromLeftOrAbove
+                ' Die Vorlage wird nur für Formatierung und
+                ' Schwellenwert verwendet. Spielerwerte werden
+                ' nicht übernommen.
+                If cVorlage > 0 Then
 
-                    If cVorher >= cBereichStart And _
-                       cVorher < cEinfügen Then
-
-                        wsDash.Columns(cVorher).Copy
-                        wsDash.Columns(cEinfügen).PasteSpecial _
-                            Paste:=xlPasteFormats
-
-                        wsDash.Cells( _
-                            zeileSchwelle2, _
-                            cEinfügen).Value = _
-                            wsDash.Cells( _
-                                zeileSchwelle2, _
-                                cVorher).Value
-
-                    ElseIf cNachher < cChestsNOK Then
-
-                        wsDash.Columns(cNachher).Copy
-                        wsDash.Columns(cEinfügen).PasteSpecial _
-                            Paste:=xlPasteFormats
-
-                        wsDash.Cells( _
-                            zeileSchwelle2, _
-                            cEinfügen).Value = _
-                            wsDash.Cells( _
-                                zeileSchwelle2, _
-                                cNachher).Value
-
+                    If cVorlage >= cEinfügen Then
+                        cVorlage = cVorlage + 1
                     End If
+
+                    wsDash.Columns(cVorlage).Copy
+
+                    wsDash.Columns(cEinfügen).PasteSpecial _
+                        Paste:=xlPasteFormats
+
+                    wsDash.Cells( _
+                        zeileSchwelle2, _
+                        cEinfügen).Value = _
+                        wsDash.Cells( _
+                            zeileSchwelle2, _
+                            cVorlage).Value
 
                     Application.CutCopyMode = False
 
-                    wsDash.Cells( _
-                        1, _
-                        cEinfügen).ClearContents
-
-                    wsDash.Cells( _
-                        zeileSummen, _
-                        cEinfügen).ClearContents
-
-                    wsDash.Cells( _
-                        zeileBezuege, _
-                        cEinfügen).Value = _
-                        quellSheetName
-
-                    nameText = _
-                        "Chests_" & _
-                        quellSheetName
-
-                    ChestsNameSicherstellen _
-                        wsDash, _
-                        cEinfügen, _
-                        zeileSummen, _
-                        nameText
-
                 End If
+
+                wsDash.Cells(1, cEinfügen).ClearContents
+
+                wsDash.Cells( _
+                    zeileSummen, _
+                    cEinfügen).ClearContents
+
+                wsDash.Cells( _
+                    zeileBezuege, _
+                    cEinfügen).Value = _
+                    quellSheetName
+
+                nameText = _
+                    "Chests_" & _
+                    quellSheetName
+
+                ChestsNameSicherstellen _
+                    wsDash, _
+                    cEinfügen, _
+                    zeileSummen, _
+                    nameText
+
+                LogEintrag _
+                    wsLog, _
+                    "CHESTS NEUE SPALTE", _
+                    "", _
+                    "Quellblatt '" & _
+                    quellSheetName & _
+                    "' wurde automatisch als '" & _
+                    nameText & _
+                    "' in den Chests-Bereich aufgenommen."
 
             End If
 
@@ -4465,8 +4476,10 @@ Private Sub ChestsSpaltenPruefen( _
 
     Next wsQuelle
 
-    ' Nach allen Einfügungen Marker und Bereichsgrenzen erneut
-    ' ausschließlich über den Namensmanager ermitteln.
+    ' ------------------------------------------------------------
+    ' BEREICH NACH DEM DYNAMISCHEN AUFBAU NEU ERMITTELN
+    ' ------------------------------------------------------------
+
     cChestsNOK = DashboardSpalte( _
         wsDash, _
         CHESTS_NOK_Kopf)
@@ -4484,8 +4497,10 @@ Private Sub ChestsSpaltenPruefen( _
 
     End If
 
-    ' Vor der vollständigen Chests-Prüfung alte Zählungen
-    ' zurücksetzen.
+    ' ------------------------------------------------------------
+    ' CHests_NOK UND ALTE MARKIERUNGEN ZURÜCKSETZEN
+    ' ------------------------------------------------------------
+
     If letzteZeileDash >= zeileSpieler1 Then
 
         wsDash.Range( _
@@ -4498,6 +4513,10 @@ Private Sub ChestsSpaltenPruefen( _
             xlAutomatic
 
     End If
+
+    ' ------------------------------------------------------------
+    ' ALLE CHestS-SPALTEN DER QUELLDATEI PRÜFEN
+    ' ------------------------------------------------------------
 
     If cBereichStart <= cBereichEnde Then
 
@@ -4512,13 +4531,11 @@ Private Sub ChestsSpaltenPruefen( _
                     kopf, _
                     datum) Then
 
-                datumText = Format$( _
-                    datum, _
-                    "yyyymmdd")
-
                 nameText = _
                     "Chests_" & _
-                    datumText
+                    Format$( _
+                        datum, _
+                        "yyyymmdd")
 
                 ChestsNameSicherstellen _
                     wsDash, _
@@ -4798,180 +4815,3 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
         If Len(spieler) > 0 Then
 
             key = SpielerKey(spieler)
-
-            wertGefunden = _
-                CollectionKeyExistiert( _
-                    spielerWerte, _
-                    key)
-
-            If wertGefunden Then
-
-                wert = CollectionWert( _
-                    spielerWerte, _
-                    key)
-
-                ' Den Quellenwert immer in die entsprechende
-                ' Dashboard-Zelle übernehmen.
-                wsDash.Cells( _
-                    i, _
-                    cDash).Value = wert
-
-                If NumerischerWert( _
-                        wert, _
-                        zahl) Then
-
-                    If zahl < schwelle Then
-
-                        If IstAktiv( _
-                                wsDash.Cells( _
-                                    i, _
-                                    DashboardSpalte(wsDash, LEG1_Basisdaten_Kopf)).Value) Then
-
-                            anzahlAktiveUnterSchwelle = _
-                                anzahlAktiveUnterSchwelle + 1
-
-                        End If
-
-                        wsDash.Cells( _
-                            i, _
-                            cDash).Font.Color = _
-                            RGB(255, 0, 0)
-
-                    Else
-
-                        wsDash.Cells( _
-                            i, _
-                            cDash).Font.ColorIndex = _
-                            xlAutomatic
-
-                    End If
-
-                Else
-
-                    wsDash.Cells( _
-                        i, _
-                        cDash).Font.ColorIndex = _
-                        xlAutomatic
-
-                End If
-
-            Else
-
-                ' Kein Quellwert: keine Wertübernahme und kein NOK.
-                wsDash.Cells( _
-                    i, _
-                    cDash).ClearContents
-
-            End If
-
-        End If
-
-    Next i
-
-    wsDash.Cells(1, cDash).Value = _
-        anzahlAktiveUnterSchwelle
-
-    ' Chests_NOK enthält die Anzahl der Chests-Spalten unterhalb
-    ' des Schwellenwerts für diesen Spieler.
-    For i = zeileSpieler1 To letzteZeileDash
-
-        spieler = SichererText( _
-            wsDash.Cells(i, cSpieler).Value)
-
-        If Len(spieler) > 0 Then
-
-            key = SpielerKey(spieler)
-
-            If CollectionKeyExistiert(spielerWerte, key) Then
-
-                wert = CollectionWert(spielerWerte, key)
-
-                If NumerischerWert(wert, zahl) Then
-
-                    If zahl < schwelle Then
-                        wsDash.Cells(i, cChestsNOK).Value = _
-                            CLng(wsDash.Cells(i, cChestsNOK).Value) + 1
-                    End If
-
-                End If
-
-            End If
-
-        End If
-
-    Next i
-
-End Sub
-
-' ============================================================
-' CHESTS-ROT-MARKIERUNG EINER SPALTE LÖSCHEN
-' ============================================================
-
-Private Sub ChestsSpalteRotMarkierungLoeschen( _
-    ByVal ws As Worksheet, _
-    ByVal cDash As Long, _
-    ByVal zeileSpieler1 As Long, _
-    ByVal letzteZeileDash As Long)
-
-    If cDash <= 0 Then Exit Sub
-    If letzteZeileDash < zeileSpieler1 Then Exit Sub
-
-    ws.Range( _
-        ws.Cells(zeileSpieler1, cDash), _
-        ws.Cells(letzteZeileDash, cDash)).Font.ColorIndex = _
-        xlAutomatic
-
-End Sub
-
-' ============================================================
-' CHESTS_NOK ZURÜCKSETZEN
-' ============================================================
-
-Private Sub ChestsNOKAlleSpielerZuruecksetzen( _
-    ByVal wsDash As Worksheet, _
-    ByVal cChestsNOK As Long, _
-    ByVal zeileSpieler1 As Long, _
-    ByVal letzteZeileDash As Long)
-
-    If cChestsNOK <= 0 Then Exit Sub
-    If letzteZeileDash < zeileSpieler1 Then Exit Sub
-
-    wsDash.Range( _
-        wsDash.Cells(zeileSpieler1, cChestsNOK), _
-        wsDash.Cells(letzteZeileDash, cChestsNOK)).Value = 0
-
-    wsDash.Range( _
-        wsDash.Cells(zeileSpieler1, cChestsNOK), _
-        wsDash.Cells(letzteZeileDash, cChestsNOK)).Font.ColorIndex = _
-        xlAutomatic
-
-End Sub
-
-' ============================================================
-' CHESTS DATUM GÜLTIG
-' ============================================================
-
-Private Function ChestsDatumGueltig( _
-    ByVal text As String, _
-    ByRef datum As Date) As Boolean
-
-    ChestsDatumGueltig = False
-
-    text = Trim$(text)
-
-    If Len(text) <> 8 Then Exit Function
-    If Not IsNumeric(text) Then Exit Function
-
-    On Error GoTo Fehler
-
-    datum = DateSerial( _
-        CLng(Left$(text, 4)), _
-        CLng(Mid$(text, 5, 2)), _
-        CLng(Right$(text, 2)))
-
-    If Format$( _
-            datum, _
-            "yyyymmdd") <> text Then
-
-        ChestsDatumGueltig = False
-        Exit Function
