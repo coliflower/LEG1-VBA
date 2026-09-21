@@ -4611,7 +4611,7 @@ Private Sub ChestsSpaltenPruefen( _
             wsLog, _
             "CHESTS BEREICH AKTUALISIERT", _
             "", _
-            "Bereich 'Chests' wurde geprüft. Datenspalten geprüft: " & _
+            "Bereich 'Chests' wurde aus '" & CHESTS_DATEI & "' neu eingelesen. Datenspalten geprüft: " & _
             CStr(cBereichEnde - cBereichStart + 1) & "."
 
     Else
@@ -4620,7 +4620,7 @@ Private Sub ChestsSpaltenPruefen( _
             wsLog, _
             "CHESTS BEREICH AKTUALISIERT", _
             "", _
-            "Chests-Bereich geprüft. Datenspalten geprüft: 0."
+            "Bereich 'Chests' wurde aus '" & CHESTS_DATEI & "' neu eingelesen. Datenspalten geprüft: 0."
 
     End If
 
