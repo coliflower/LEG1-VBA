@@ -4198,7 +4198,7 @@ Private Sub CarterBereichPruefen( _
         wsLog, _
         "CARTER BEREICH AKTUALISIERT", _
         "", _
-        "Carter-Bereich geprüft. Datenspalten geprüft: " & _
+        "Bereich 'Carter' wurde geprüft. Datenspalten geprüft: " & _
         CStr(cBereichEnde - cBereichStart + 1) & "."
 
 End Sub
@@ -4611,7 +4611,7 @@ Private Sub ChestsSpaltenPruefen( _
             wsLog, _
             "CHESTS BEREICH AKTUALISIERT", _
             "", _
-            "Chests-Bereich geprüft. Datenspalten geprüft: " & _
+            "Bereich 'Chests' wurde geprüft. Datenspalten geprüft: " & _
             CStr(cBereichEnde - cBereichStart + 1) & "."
 
     Else
