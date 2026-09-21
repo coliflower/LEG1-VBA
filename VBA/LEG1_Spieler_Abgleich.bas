@@ -505,7 +505,7 @@ NaechsterUpdateSpieler:
 
             wsDash.Cells( _
                 letzteZeileDash, _
-                cInternNeu).Value = GetUTCNow()
+                cInternNeu).Value = GetAktuelleZeit()
 
             wsDash.Cells( _
                 letzteZeileDash, _
@@ -3620,7 +3620,7 @@ Private Sub T9SeitAktualisieren( _
 
             wsDash.Cells( _
                 dashZeile, _
-                cT9Seit).Value = GetUTCNow()
+                cT9Seit).Value = GetAktuelleZeit()
 
             wsDash.Cells( _
                 dashZeile, _
@@ -3631,7 +3631,7 @@ Private Sub T9SeitAktualisieren( _
 
             wsDash.Cells( _
                 dashZeile, _
-                cT9Seit).Value = GetUTCNow()
+                cT9Seit).Value = GetAktuelleZeit()
 
             wsDash.Cells( _
                 dashZeile, _
@@ -3643,9 +3643,10 @@ Private Sub T9SeitAktualisieren( _
     ' --------------------------------------------------------
     ' T9_seit ist ein historischer Breakpoint.
     '
-    ' Sobald ein Spieler erstmals T9 erreicht, wird das Datum
-    ' gesetzt. Danach bleibt es dauerhaft erhalten, auch wenn
-    ' der Spieler später wieder unter T9 fällt.
+    ' Sobald ein Spieler erstmals T9 erreicht, werden Datum und
+    ' Uhrzeit der Ausführung gesetzt. Danach bleibt der Wert
+    ' dauerhaft erhalten, auch wenn der Spieler später wieder
+    ' unter T9 fällt.
     ' --------------------------------------------------------
 
     End If
@@ -3761,7 +3762,7 @@ Private Sub NeueSpielerFarbeZuruecksetzen( _
 
     If cEnde < cSpieler Then Exit Sub
 
-    zeitpunkt = GetUTCNow()
+    zeitpunkt = GetAktuelleZeit()
 
     For i = zeileSpieler1 To letzteZeile
 
@@ -4191,6 +4192,13 @@ Private Sub CarterBereichPruefen( _
 
     Next i
 
+    LogEintrag _
+        wsLog, _
+        "CARTER BEREICH AKTUALISIERT", _
+        "", _
+        "Carter-Bereich geprüft. Datenspalten geprüft: " & _
+        CStr(cBereichEnde - cBereichStart + 1) & "."
+
 End Sub
 
 ' ============================================================
@@ -4595,6 +4603,25 @@ Private Sub ChestsSpaltenPruefen( _
 
     End If
 
+    If cBereichStart <= cBereichEnde Then
+
+        LogEintrag _
+            wsLog, _
+            "CHESTS BEREICH AKTUALISIERT", _
+            "", _
+            "Chests-Bereich geprüft. Datenspalten geprüft: " & _
+            CStr(cBereichEnde - cBereichStart + 1) & "."
+
+    Else
+
+        LogEintrag _
+            wsLog, _
+            "CHESTS BEREICH AKTUALISIERT", _
+            "", _
+            "Chests-Bereich geprüft. Datenspalten geprüft: 0."
+
+    End If
+
 ChestsBeenden:
 
     If Not wbWarBereitsOffen Then
@@ -4927,11 +4954,18 @@ Private Sub ChestsSpalteImportierenUndPruefen( _
 
                 wert = CollectionWert(spielerWerte, key)
 
-                If NumerischerWert(wert, zahl) Then
+                If IstAktiv( _
+                        wsDash.Cells( _
+                            i, _
+                            DashboardSpalte(wsDash, LEG1_Basisdaten_Kopf)).Value) Then
 
-                    If zahl < schwelle Then
-                        wsDash.Cells(i, cChestsNOK).Value = _
-                            CLng(wsDash.Cells(i, cChestsNOK).Value) + 1
+                    If NumerischerWert(wert, zahl) Then
+
+                        If zahl < schwelle Then
+                            wsDash.Cells(i, cChestsNOK).Value = _
+                                CLng(wsDash.Cells(i, cChestsNOK).Value) + 1
+                        End If
+
                     End If
 
                 End If
@@ -5288,7 +5322,7 @@ Private Sub LogEintrag( _
             wsLog.Rows.Count, _
             1).End(xlUp).Row + 1
 
-    wsLog.Cells(zeile, 1).Value = GetUTCNow()
+    wsLog.Cells(zeile, 1).Value = GetAktuelleZeit()
     wsLog.Cells(zeile, 2).Value = typ
     wsLog.Cells(zeile, 3).Value = spieler
     wsLog.Cells(zeile, 4).Value = information
@@ -5336,7 +5370,7 @@ Private Sub SicherungErstellen( _
     dateiname = _
         "LEG1_Backup_" & _
         Format$( _
-            GetUTCNow(), _
+            GetAktuelleZeit(), _
             "yyyymmdd_hhnnss") & _
         ".xlsm"
 
@@ -5376,8 +5410,19 @@ Fehler:
 
 End Sub
 
-Private Function GetUTCNow() As Date
+' ============================================================
+' AKTUELLE ZEIT
+'
+' Bewusst lokale Excel-Zeit statt Betriebssystem-API.
+'
+' Eine echte UTC-Ermittlung würde auf Mac und Windows
+' unterschiedliche Betriebssystem-Schnittstellen erfordern.
+' Diese wurden im Projekt bewusst vermieden, damit der Code
+' vollständig Mac-/Windows-kompatibel bleibt.
+' ============================================================
 
-    GetUTCNow = Now()
+Private Function GetAktuelleZeit() As Date
+
+    GetAktuelleZeit = Now()
 
 End Function
