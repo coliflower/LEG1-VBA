@@ -625,7 +625,8 @@ NaechsterUpdateSpielerNeu:
         wsDash, _
         cBasisdaten, _
         zeileSpieler1, _
-        letzteZeileDash
+        letzteZeileDash, _
+        wsLog
 
     schritt = "Chests-Spalten und Chests-Daten prüfen"
 
@@ -4022,7 +4023,8 @@ Private Sub CarterBereichPruefen( _
     ByVal wsDash As Worksheet, _
     ByVal cBasisdaten As Long, _
     ByVal zeileSpieler1 As Long, _
-    ByVal letzteZeile As Long)
+    ByVal letzteZeile As Long, _
+    ByVal wsLog As Worksheet)
 
     Dim cCarterNOK As Long
     Dim cBereichStart As Long
