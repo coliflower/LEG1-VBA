@@ -2558,7 +2558,7 @@ Private Sub TBBereichVorhandenAktualisieren( _
 
     LogEintrag _
         wsLog, _
-        "TB__ BEREICH AKTUALISIERT", _
+        "BEREICH AKTUALISIERT", _
         "", _
         "Bereich '" & bereichsName & "' wurde aus '" & _
         dateiname & "' neu eingelesen. Datenspalten geprüft: " & _
@@ -4196,7 +4196,7 @@ Private Sub CarterBereichPruefen( _
 
     LogEintrag _
         wsLog, _
-        "CARTER BEREICH AKTUALISIERT", _
+        "BEREICH AKTUALISIERT", _
         "", _
         "Bereich 'Carter' wurde geprüft. Datenspalten geprüft: " & _
         CStr(cBereichEnde - cBereichStart + 1) & "."
@@ -4609,7 +4609,7 @@ Private Sub ChestsSpaltenPruefen( _
 
         LogEintrag _
             wsLog, _
-            "CHESTS BEREICH AKTUALISIERT", _
+            "BEREICH AKTUALISIERT", _
             "", _
             "Bereich 'Chests' wurde aus '" & CHESTS_DATEI & "' neu eingelesen. Datenspalten geprüft: " & _
             CStr(cBereichEnde - cBereichStart + 1) & "."
@@ -4618,7 +4618,7 @@ Private Sub ChestsSpaltenPruefen( _
 
         LogEintrag _
             wsLog, _
-            "CHESTS BEREICH AKTUALISIERT", _
+            "BEREICH AKTUALISIERT", _
             "", _
             "Bereich 'Chests' wurde aus '" & CHESTS_DATEI & "' neu eingelesen. Datenspalten geprüft: 0."
 
