@@ -5397,3 +5397,5 @@ End Sub
 Private Function GetAktuelleZeit() As Date
 
     GetAktuelleZeit = Now()
+
+End Function
