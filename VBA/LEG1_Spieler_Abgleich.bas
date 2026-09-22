@@ -52,7 +52,6 @@ Private Const UPDATE_JOINED_SPALTE As Long = 12
 
 Private Const CHESTS_SPIELER_SPALTE As Long = 3
 Private Const CHESTS_WERT_SPALTE As Long = 5
-Private Const CHESTS_KOPFZEILE As Long = 3
 Private Const CHESTS_DATENSTART As Long = 3
 
 ' ============================================================
@@ -265,9 +264,7 @@ Public Sub LEG1_Spieler_Abgleich()
 
     schritt = "Update-Daten prüfen"
 
-    UpdateDatenPruefen _
-        wsUpdate, _
-        letzteZeileUpdate
+    UpdateDatenPruefen letzteZeileUpdate
 
     schritt = "Spielerdaten einlesen"
 
@@ -1453,10 +1450,7 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
     Dim letzteZeileQuelle As Long
 
     Dim sheetName As String
-    Dim datenName As String
 
-    Dim namePruefen As String
-    Dim namenKollision As Boolean
 
     If wsDash Is Nothing Then Exit Sub
     If cBasisdaten <= 0 Then Exit Sub
@@ -1542,7 +1536,6 @@ Private Sub NeueTBBereicheAutomatischAnlegen( _
                         wsDash, _
                         cBasisdaten, _
                         cNOK, _
-                        zeileSummen, _
                         zeileSchwelle1, _
                         zeileSchwelle2, _
                         zeileBezuege, _
@@ -2171,7 +2164,6 @@ Private Sub TBBereichVorhandenAktualisieren( _
     ByVal wsDash As Worksheet, _
     ByVal cBasisdaten As Long, _
     ByVal cNOK As Long, _
-    ByVal zeileSummen As Long, _
     ByVal zeileSchwelle1 As Long, _
     ByVal zeileSchwelle2 As Long, _
     ByVal zeileBezuege As Long, _
@@ -3223,7 +3215,6 @@ End Function
 ' ============================================================
 
 Private Sub UpdateDatenPruefen( _
-    ByVal wsUpdate As Worksheet, _
     ByVal letzteZeileUpdate As Long)
 
     If letzteZeileUpdate < 2 Then
@@ -5000,26 +4991,6 @@ Private Sub ChestsSpalteRotMarkierungLoeschen( _
 
 End Sub
 
-Private Sub ChestsNOKAlleSpielerZuruecksetzen( _
-    ByVal wsDash As Worksheet, _
-    ByVal cChestsNOK As Long, _
-    ByVal zeileSpieler1 As Long, _
-    ByVal letzteZeileDash As Long)
-
-    If cChestsNOK <= 0 Then Exit Sub
-    If letzteZeileDash < zeileSpieler1 Then Exit Sub
-
-    wsDash.Range( _
-        wsDash.Cells(zeileSpieler1, cChestsNOK), _
-        wsDash.Cells(letzteZeileDash, cChestsNOK)).Value = 0
-
-    wsDash.Range( _
-        wsDash.Cells(zeileSpieler1, cChestsNOK), _
-        wsDash.Cells(letzteZeileDash, cChestsNOK)).Font.ColorIndex = _
-        xlAutomatic
-
-End Sub
-
 Private Function ChestsDatumGueltig( _
     ByVal text As String, _
     ByRef datum As Date) As Boolean
@@ -5426,5 +5397,3 @@ End Sub
 Private Function GetAktuelleZeit() As Date
 
     GetAktuelleZeit = Now()
-
-End Function
