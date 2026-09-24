@@ -1,0 +1,156 @@
+name: Update API INPUT.json
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update-input:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch complete member dataset
+        env:
+          CT_EMAIL: ${{ secrets.CT_EMAIL }}
+          CT_PASSWORD: ${{ secrets.CT_PASSWORD }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          BASE_URL = "https://api.chesttracker.com"
+          AUTH_URL = BASE_URL + "/v1/authenticate"
+          MEMBERS_URL = BASE_URL + "/v1/members"
+          OUTPUT = "VBA/INPUT.json"
+          PAGE_SIZE = 100
+
+          email = os.environ.get("CT_EMAIL", "")
+          password = os.environ.get("CT_PASSWORD", "")
+
+          if not email or not password:
+              raise SystemExit("Missing GitHub Actions secrets CT_EMAIL and/or CT_PASSWORD.")
+
+          def request_json(url, method="GET", body=None, token=None):
+              headers = {
+                  "Accept": "application/json",
+                  "Content-Type": "application/json",
+              }
+              if token:
+                  headers["Authorization"] = token
+
+              data = None
+              if body is not None:
+                  data = json.dumps(body).encode("utf-8")
+
+              request = urllib.request.Request(url, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      raw = response.read().decode("utf-8")
+                      return json.loads(raw)
+              except urllib.error.HTTPError as exc:
+                  detail = exc.read().decode("utf-8", errors="replace")
+                  raise SystemExit(
+                      f"API request failed: HTTP {exc.code} {exc.reason}: {detail}"
+                  )
+
+          # 1. Authenticate. The API specification defines email/password and
+          # returns a session token. We deliberately keep the token only in memory.
+          auth = request_json(
+              AUTH_URL,
+              method="POST",
+              body={
+                  "email": email,
+                  "password": password,
+                  "remember": False,
+              },
+          )
+
+          auth_token = auth.get("authToken")
+          if not auth_token:
+              raise SystemExit("Authentication succeeded without an authToken.")
+
+          if not auth_token.lower().startswith("bearer "):
+              auth_token = "Bearer " + auth_token
+
+          # 2. Retrieve every member page. We do not select fields or filter
+          # records, so the repository keeps the complete member payload.
+          all_members = []
+          page = 0
+          reported_total = None
+
+          while True:
+              query = urllib.parse.urlencode({
+                  "page": page,
+                  "size": PAGE_SIZE,
+              })
+              payload = request_json(
+                  MEMBERS_URL + "?" + query,
+                  method="GET",
+                  token=auth_token,
+              )
+
+              if (
+                  not isinstance(payload, list)
+                  or len(payload) != 2
+                  or not isinstance(payload[0], list)
+                  or not isinstance(payload[1], int)
+              ):
+                  raise SystemExit(
+                      "Unexpected /v1/members response format. Expected [members, total]."
+                  )
+
+              members, total = payload
+              if reported_total is None:
+                  reported_total = total
+
+              all_members.extend(members)
+
+              if len(all_members) >= total or not members:
+                  break
+
+              page += 1
+
+          if reported_total is None:
+              raise SystemExit("API returned no member count.")
+
+          if len(all_members) != reported_total:
+              raise SystemExit(
+                  f"Incomplete API pull: received {len(all_members)} members, "
+                  f"API reports {reported_total}."
+              )
+
+          # 3. Keep the same raw API response shape used by the current INPUT.json:
+          # [ [member, member, ...], total ]
+          result = [all_members, reported_total]
+
+          with open(OUTPUT, "w", encoding="utf-8", newline="\n") as handle:
+              json.dump(result, handle, ensure_ascii=False, indent=2)
+              handle.write("\n")
+
+          print(f"API pull complete: {len(all_members)} members written to {OUTPUT}")
+          PY
+
+      - name: Commit changed INPUT.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add VBA/INPUT.json
+
+          if git diff --cached --quiet; then
+            echo "INPUT.json is unchanged."
+            exit 0
+          fi
+
+          git commit -m "Update API INPUT.json"
+          git push
