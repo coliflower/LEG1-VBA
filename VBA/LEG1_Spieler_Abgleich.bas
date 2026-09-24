@@ -945,6 +945,28 @@ Private Function INPUTDownloadTabelleAlsText( _
 
 End Function
 
+Private Function LetzteBelegteZeile( _
+    ByVal ws As Worksheet) As Long
+
+    Dim letzteZelle As Range
+
+    If ws Is Nothing Then Exit Function
+
+    Set letzteZelle = ws.Cells.Find( _
+        What:="*", _
+        After:=ws.Cells(1, 1), _
+        LookIn:=xlFormulas, _
+        LookAt:=xlPart, _
+        SearchOrder:=xlByRows, _
+        SearchDirection:=xlPrevious, _
+        MatchCase:=False)
+
+    If Not letzteZelle Is Nothing Then
+        LetzteBelegteZeile = letzteZelle.Row
+    End If
+
+End Function
+
 Private Function INPUTGitHubBase64AusJSON( _
     ByVal jsonText As String) As String
 
