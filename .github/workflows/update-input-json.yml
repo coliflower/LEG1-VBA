@@ -33,6 +33,7 @@ jobs:
           MEMBERS_URL = BASE_URL + "/v1/members"
           OUTPUT = "VBA/INPUT.json"
           PAGE_SIZE = 100
+          USER_AGENT = "Mozilla/5.0 (compatible; ChestTracker-GitHubSync/1.0)"
 
           email = os.environ.get("CT_EMAIL", "")
           password = os.environ.get("CT_PASSWORD", "")
@@ -44,6 +45,7 @@ jobs:
               headers = {
                   "Accept": "application/json",
                   "Content-Type": "application/json",
+                  "User-Agent": USER_AGENT,
               }
               if token:
                   headers["Authorization"] = token
