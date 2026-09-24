@@ -5,9 +5,11 @@ Option Explicit
 ' ============================================================
 
 Private Const DashboardBlattName As String = "dashboard"
-Private Const UpdateBlattName As String = "update"
-
 Private Const CHESTS_DATEI As String = "TB__Chests.xlsx"
+Private Const INPUT_GITHUB_API_URL As String = _
+    "https://api.github.com/repos/coliflower/LEG1-VBA/contents/VBA/INPUT.json?ref=main"
+Private Const INPUT_TEMP_SHEET As String = "__LEG1_INPUT"
+Private Const INPUT_DOWNLOAD_SHEET As String = "__LEG1_INPUT_DOWNLOAD"
 
 ' ------------------------------------------------------------
 ' Dashboard - definierte Namen / Name Manager
@@ -39,16 +41,16 @@ Private Const NAME_DASHBOARD_SCHWELLE2 As String = "Dashboard_3_schwelle_2"
 Private Const NAME_DASHBOARD_BEZUEGE As String = "Dashboard_4_bezüge"
 Private Const NAME_DASHBOARD_SPIELER1 As String = "Dashboard_spieler_1"
 
-Private Const UPDATE_SPIELER_SPALTE As Long = 1
-Private Const UPDATE_RANG_SPALTE As Long = 2
-Private Const UPDATE_ALIASE_SPALTE As Long = 3
-Private Const UPDATE_H_SPALTE As Long = 4
-Private Const UPDATE_MACHT_SPALTE As Long = 5
-Private Const UPDATE_G_SPALTE As Long = 6
-Private Const UPDATE_M_SPALTE As Long = 7
-Private Const UPDATE_S_SPALTE As Long = 8
-Private Const UPDATE_E_SPALTE As Long = 9
-Private Const UPDATE_JOINED_SPALTE As Long = 12
+Private Const INPUT_SPIELER_SPALTE As Long = 1
+Private Const INPUT_RANG_SPALTE As Long = 2
+Private Const INPUT_ALIASE_SPALTE As Long = 3
+Private Const INPUT_H_SPALTE As Long = 4
+Private Const INPUT_MACHT_SPALTE As Long = 5
+Private Const INPUT_G_SPALTE As Long = 6
+Private Const INPUT_M_SPALTE As Long = 7
+Private Const INPUT_S_SPALTE As Long = 8
+Private Const INPUT_E_SPALTE As Long = 9
+Private Const INPUT_JOINED_SPALTE As Long = 12
 
 Private Const CHESTS_SPIELER_SPALTE As Long = 3
 Private Const CHESTS_WERT_SPALTE As Long = 5
@@ -61,7 +63,7 @@ Private Const CHESTS_DATENSTART As Long = 3
 Public Sub LEG1_Spieler_Abgleich()
 
     Dim wsDash As Worksheet
-    Dim wsUpdate As Worksheet
+    Dim wsInput As Worksheet
     Dim wsLog As Worksheet
 
     Dim cSpieler As Long
@@ -89,7 +91,7 @@ Public Sub LEG1_Spieler_Abgleich()
     Dim zeileSpieler1 As Long
 
     Dim letzteZeileDash As Long
-    Dim letzteZeileUpdate As Long
+    Dim letzteZeileInput As Long
 
     Dim neueSpieler As Long
     Dim wiederAktiv As Long
@@ -102,7 +104,7 @@ Public Sub LEG1_Spieler_Abgleich()
     Dim dashZeile As Long
 
     Dim dashboardSpieler As Collection
-    Dim updateSpieler As Collection
+    Dim inputSpieler As Collection
     Dim verarbeitetSpieler As Collection
 
     Dim neueZeilen As Collection
@@ -131,7 +133,7 @@ Public Sub LEG1_Spieler_Abgleich()
     schritt = "Arbeitsblätter setzen"
 
     Set wsDash = ThisWorkbook.Worksheets(DashboardBlattName)
-    Set wsUpdate = ThisWorkbook.Worksheets(UpdateBlattName)
+    Set wsInput = INPUTArbeitsblattErstellen(wsLog)
 
     Set wsLog = LogBlattErstellen()
 
@@ -223,9 +225,9 @@ Public Sub LEG1_Spieler_Abgleich()
         cSpieler, _
         zeileSpieler1)
 
-    letzteZeileUpdate = LetzteSpielerZeile( _
-        wsUpdate, _
-        UPDATE_SPIELER_SPALTE, _
+    letzteZeileInput = LetzteSpielerZeile( _
+        wsInput, _
+        INPUT_SPIELER_SPALTE, _
         2)
 
     NeueSpielerFarbeZuruecksetzen _
@@ -262,14 +264,14 @@ Public Sub LEG1_Spieler_Abgleich()
 
     End If
 
-    schritt = "Update-Daten prüfen"
+    schritt = "INPUT.json prüfen"
 
-    UpdateDatenPruefen letzteZeileUpdate
+    INPUTDatenPruefen letzteZeileInput
 
     schritt = "Spielerdaten einlesen"
 
     Set dashboardSpieler = New Collection
-    Set updateSpieler = New Collection
+    Set inputSpieler = New Collection
     Set verarbeitetSpieler = New Collection
 
     For i = zeileSpieler1 To letzteZeileDash
@@ -293,35 +295,35 @@ Public Sub LEG1_Spieler_Abgleich()
 
     Next i
 
-    For i = 2 To letzteZeileUpdate
+    For i = 2 To letzteZeileInput
 
         spieler = SichererText( _
-            wsUpdate.Cells( _
+            wsInput.Cells( _
                 i, _
-                UPDATE_SPIELER_SPALTE).Value)
+                INPUT_SPIELER_SPALTE).Value)
 
         If Len(spieler) = 0 Then _
-            GoTo NaechsterUpdateSpielerEinlesen
+            GoTo NaechsterInputSpielerEinlesen
 
         key = SpielerKey(spieler)
 
         If CollectionKeyExistiert( _
-                updateSpieler, _
+                inputSpieler, _
                 key) Then
 
             LogEintrag _
                 wsLog, _
-                "DUPLIKAT UPDATE", _
+                "DUPLIKAT INPUT", _
                 spieler, _
-                "Spieler kommt mehrfach im Update vor."
+                "Spieler kommt mehrfach in INPUT.json vor."
 
-            GoTo NaechsterUpdateSpielerEinlesen
+            GoTo NaechsterInputSpielerEinlesen
 
         End If
 
-        updateSpieler.Add i, key
+        inputSpieler.Add i, key
 
-NaechsterUpdateSpielerEinlesen:
+NaechsterInputSpielerEinlesen:
 
     Next i
 
@@ -360,15 +362,15 @@ NaechsterUpdateSpielerEinlesen:
 
     schritt = "Bestehende Spieler aktualisieren"
 
-    For i = 2 To letzteZeileUpdate
+    For i = 2 To letzteZeileInput
 
         spieler = SichererText( _
-            wsUpdate.Cells( _
+            wsInput.Cells( _
                 i, _
-                UPDATE_SPIELER_SPALTE).Value)
+                INPUT_SPIELER_SPALTE).Value)
 
         If Len(spieler) = 0 Then _
-            GoTo NaechsterUpdateSpieler
+            GoTo NaechsterInputSpieler
 
         key = SpielerKey(spieler)
 
@@ -406,13 +408,13 @@ NaechsterUpdateSpielerEinlesen:
                     wsLog, _
                     "WIEDER AKTIV", _
                     spieler, _
-                    "Spieler ist wieder im aktuellen Update vorhanden."
+                    "Spieler ist wieder in den aktuellen INPUT-Daten vorhanden."
 
             End If
 
             If DatenAenderungenErmitteln( _
                     wsDash, _
-                    wsUpdate, _
+                    wsInput, _
                     dashZeile, _
                     i, _
                     cSpieler, _
@@ -428,7 +430,7 @@ NaechsterUpdateSpielerEinlesen:
 
                 DatenUebernehmen _
                     wsDash, _
-                    wsUpdate, _
+                    wsInput, _
                     dashZeile, _
                     i, _
                     cSpieler, _
@@ -455,21 +457,21 @@ NaechsterUpdateSpielerEinlesen:
 
         End If
 
-NaechsterUpdateSpieler:
+NaechsterInputSpieler:
 
     Next i
 
     schritt = "Neue Spieler anlegen"
 
-    For i = 2 To letzteZeileUpdate
+    For i = 2 To letzteZeileInput
 
         spieler = SichererText( _
-            wsUpdate.Cells( _
+            wsInput.Cells( _
                 i, _
-                UPDATE_SPIELER_SPALTE).Value)
+                INPUT_SPIELER_SPALTE).Value)
 
         If Len(spieler) = 0 Then _
-            GoTo NaechsterUpdateSpielerNeu
+            GoTo NaechsterInputSpielerNeu
 
         key = SpielerKey(spieler)
 
@@ -482,7 +484,7 @@ NaechsterUpdateSpieler:
 
             DatenUebernehmen _
                 wsDash, _
-                wsUpdate, _
+                wsInput, _
                 letzteZeileDash, _
                 i, _
                 cSpieler, _
@@ -535,7 +537,7 @@ NaechsterUpdateSpieler:
 
         End If
 
-NaechsterUpdateSpielerNeu:
+NaechsterInputSpielerNeu:
 
     Next i
 
@@ -555,7 +557,7 @@ NaechsterUpdateSpielerNeu:
                     key) Then
 
                 If Not CollectionKeyExistiert( _
-                        updateSpieler, _
+                        inputSpieler, _
                         key) Then
 
                     If IstAktiv( _
@@ -574,7 +576,7 @@ NaechsterUpdateSpielerNeu:
                             wsLog, _
                             "INAKTIV", _
                             spieler, _
-                            "Spieler ist im aktuellen Update nicht vorhanden."
+                            "Spieler ist in den aktuellen INPUT-Daten nicht vorhanden."
 
                     End If
 
@@ -689,6 +691,8 @@ NaechsterUpdateSpielerNeu:
 
     Application.Calculate
 
+    INPUTArbeitsblattLoeschen wsInput
+
     Application.Calculation = alterCalc
     Application.ScreenUpdating = alterScreenUpdating
     Application.EnableEvents = alterEnableEvents
@@ -710,6 +714,8 @@ Fehler:
     errDesc = Err.Description
 
     On Error Resume Next
+
+    INPUTArbeitsblattLoeschen wsInput
 
     Application.Calculation = alterCalc
     Application.ScreenUpdating = alterScreenUpdating
@@ -734,6 +740,853 @@ Fehler:
         vbCritical
 
 End Sub
+
+
+' ============================================================
+' INPUT.JSON -> TEMPORÄRE ARBEITSTABELLE
+' ============================================================
+
+Private Function INPUTArbeitsblattErstellen( _
+    ByVal wsLog As Worksheet) As Worksheet
+
+    Dim ws As Worksheet
+    Dim jsonText As String
+    Dim anzahl As Long
+    Dim errNum As Long
+    Dim errDesc As String
+
+    On Error GoTo Fehler
+
+    On Error Resume Next
+    ThisWorkbook.Worksheets(INPUT_TEMP_SHEET).Delete
+    On Error GoTo Fehler
+
+    Set ws = ThisWorkbook.Worksheets.Add( _
+        After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+
+    ws.Name = INPUT_TEMP_SHEET
+    ws.Visible = xlSheetVeryHidden
+
+    ws.Cells(1, INPUT_SPIELER_SPALTE).Value = "spieler"
+    ws.Cells(1, INPUT_RANG_SPALTE).Value = "rang"
+    ws.Cells(1, INPUT_ALIASE_SPALTE).Value = "aliasse"
+    ws.Cells(1, INPUT_H_SPALTE).Value = "H"
+    ws.Cells(1, INPUT_MACHT_SPALTE).Value = "macht"
+    ws.Cells(1, INPUT_G_SPALTE).Value = "G"
+    ws.Cells(1, INPUT_M_SPALTE).Value = "M"
+    ws.Cells(1, INPUT_S_SPALTE).Value = "S"
+    ws.Cells(1, INPUT_E_SPALTE).Value = "E"
+    ws.Cells(1, 10).Value = ""
+    ws.Cells(1, 11).Value = ""
+    ws.Cells(1, INPUT_JOINED_SPALTE).Value = "joined"
+
+    jsonText = INPUTGitHubJSONLaden()
+
+    If Len(Trim$(jsonText)) = 0 Then
+        Err.Raise 1004, , "INPUT.json wurde leer geladen."
+    End If
+
+    anzahl = INPUTJSONInTabelle(jsonText, ws)
+
+    If anzahl <= 0 Then
+        Err.Raise 1004, , "INPUT.json enthält keine Spielerdaten."
+    End If
+
+    LogEintrag _
+        wsLog, _
+        "INPUT JSON", _
+        "", _
+        "INPUT.json erfolgreich geladen: " & CStr(anzahl) & _
+        " Spieler. Die temporäre Importtabelle wird nur für diesen Lauf verwendet."
+
+    Set INPUTArbeitsblattErstellen = ws
+    Exit Function
+
+Fehler:
+
+    errNum = Err.Number
+    errDesc = Err.Description
+
+    On Error Resume Next
+    If Not ws Is Nothing Then ws.Delete
+    On Error GoTo 0
+
+    Err.Raise errNum, _
+        "INPUTArbeitsblattErstellen", _
+        "INPUT.json konnte nicht als Datenquelle bereitgestellt werden." & _
+        vbCrLf & errDesc
+
+End Function
+
+Private Sub INPUTArbeitsblattLoeschen( _
+    ByVal ws As Worksheet)
+
+    On Error Resume Next
+
+    If Not ws Is Nothing Then
+        Application.DisplayAlerts = False
+        ws.Delete
+        Application.DisplayAlerts = True
+    End If
+
+    On Error GoTo 0
+
+End Sub
+
+Private Function INPUTGitHubJSONLaden() As String
+
+    Dim wb As Workbook
+    Dim ws As Worksheet
+    Dim qt As QueryTable
+    Dim rawText As String
+    Dim downloadErrorNumber As Long
+    Dim downloadErrorDescription As String
+
+    On Error GoTo Fehler
+
+    Set wb = ThisWorkbook
+
+    On Error Resume Next
+    wb.Worksheets(INPUT_DOWNLOAD_SHEET).Delete
+    On Error GoTo Fehler
+
+    Set ws = wb.Worksheets.Add( _
+        After:=wb.Worksheets(wb.Worksheets.Count))
+
+    ws.Name = INPUT_DOWNLOAD_SHEET
+
+    Set qt = ws.QueryTables.Add( _
+        Connection:="URL;" & INPUT_GITHUB_API_URL, _
+        Destination:=ws.Range("A1"))
+
+    With qt
+
+        .BackgroundQuery = False
+        .RefreshStyle = xlOverwriteCells
+        .AdjustColumnWidth = False
+
+        On Error Resume Next
+        Err.Clear
+        .Refresh
+
+        downloadErrorNumber = Err.Number
+        downloadErrorDescription = Err.Description
+
+        On Error GoTo Fehler
+
+        If downloadErrorNumber <> 0 Then
+            Err.Raise downloadErrorNumber, _
+                "INPUTGitHubJSONLaden / QueryTable.Refresh", _
+                downloadErrorDescription
+        End If
+
+    End With
+
+    rawText = INPUTDownloadTabelleAlsText(ws)
+
+    If Len(rawText) = 0 Then
+        Err.Raise 1004, , "Die GitHub-Antwort für INPUT.json ist leer."
+    End If
+
+    rawText = INPUTGitHubBase64AusJSON(rawText)
+
+    If Len(rawText) = 0 Then
+        Err.Raise 1004, , _
+            "Die GitHub-Antwort enthält keinen Base64-Inhalt für INPUT.json."
+    End If
+
+    INPUTGitHubJSONLaden = INPUTBase64UTF8Dekodieren(rawText)
+
+    qt.Delete
+
+    On Error Resume Next
+    ws.Delete
+    On Error GoTo 0
+
+    Exit Function
+
+Fehler:
+
+    downloadErrorNumber = Err.Number
+    downloadErrorDescription = Err.Description
+
+    On Error Resume Next
+    If Not qt Is Nothing Then qt.Delete
+    If Not ws Is Nothing Then ws.Delete
+    On Error GoTo 0
+
+    Err.Raise downloadErrorNumber, _
+        "INPUTGitHubJSONLaden", _
+        "INPUT.json konnte von GitHub nicht geladen werden." & _
+        vbCrLf & downloadErrorDescription
+
+End Function
+
+Private Function INPUTDownloadTabelleAlsText( _
+    ByVal ws As Worksheet) As String
+
+    Dim letzteZeile As Long
+    Dim r As Long
+    Dim v As Variant
+    Dim result As String
+
+    letzteZeile = LetzteBelegteZeile(ws)
+
+    If letzteZeile <= 0 Then Exit Function
+
+    For r = 1 To letzteZeile
+        v = ws.Cells(r, 1).Value2
+        If Not IsError(v) Then
+            If Len(CStr(v)) > 0 Then result = result & CStr(v)
+        End If
+    Next r
+
+    INPUTDownloadTabelleAlsText = result
+
+End Function
+
+Private Function INPUTGitHubBase64AusJSON( _
+    ByVal jsonText As String) As String
+
+    Dim marker As String
+    Dim startPos As Long
+    Dim endPos As Long
+    Dim contentText As String
+
+    marker = """content"":"""
+    startPos = InStr(1, jsonText, marker, vbBinaryCompare)
+
+    If startPos = 0 Then Exit Function
+
+    startPos = startPos + Len(marker)
+    endPos = InStr(startPos, jsonText, """", vbBinaryCompare)
+
+    If endPos = 0 Then Exit Function
+
+    contentText = Mid$(jsonText, startPos, endPos - startPos)
+
+    contentText = Replace(contentText, vbCr, vbNullString)
+    contentText = Replace(contentText, vbLf, vbNullString)
+    contentText = Replace(contentText, "\n", vbNullString)
+    contentText = Replace(contentText, "\r", vbNullString)
+    contentText = Replace(contentText, " ", vbNullString)
+    contentText = Replace(contentText, vbTab, vbNullString)
+
+    INPUTGitHubBase64AusJSON = contentText
+
+End Function
+
+Private Function INPUTBase64UTF8Dekodieren( _
+    ByVal base64Text As String) As String
+
+    Dim data() As Byte
+    Dim dataLength As Long
+
+    data = INPUTBase64Dekodieren(base64Text, dataLength)
+
+    If dataLength <= 0 Then Exit Function
+
+    INPUTBase64UTF8Dekodieren = _
+        INPUTUTF8BytesZuString(data, dataLength)
+
+End Function
+
+Private Function INPUTBase64Dekodieren( _
+    ByVal base64Text As String, _
+    ByRef dataLength As Long) As Byte()
+
+    Dim output() As Byte
+    Dim i As Long
+    Dim n As Long
+    Dim a As Long
+    Dim b As Long
+    Dim c As Long
+    Dim d As Long
+    Dim ch As String
+
+    ReDim output(0 To 0)
+    dataLength = 0
+
+    base64Text = Replace(base64Text, vbCr, vbNullString)
+    base64Text = Replace(base64Text, vbLf, vbNullString)
+    base64Text = Replace(base64Text, " ", vbNullString)
+    base64Text = Replace(base64Text, vbTab, vbNullString)
+
+    n = Len(base64Text)
+
+    If n = 0 Then
+        INPUTBase64Dekodieren = output
+        Exit Function
+    End If
+
+    ReDim output(0 To ((n \ 4) * 3) + 2)
+
+    For i = 1 To n Step 4
+
+        a = INPUTBase64Wert(Mid$(base64Text, i, 1))
+        b = INPUTBase64Wert(Mid$(base64Text, i + 1, 1))
+
+        If i + 2 <= n Then
+            ch = Mid$(base64Text, i + 2, 1)
+            If ch = "=" Then c = 0 Else c = INPUTBase64Wert(ch)
+        Else
+            c = 0
+        End If
+
+        If i + 3 <= n Then
+            ch = Mid$(base64Text, i + 3, 1)
+            If ch = "=" Then d = 0 Else d = INPUTBase64Wert(ch)
+        Else
+            d = 0
+        End If
+
+        output(dataLength) = CByte((a * 4) + (b \ 16))
+        dataLength = dataLength + 1
+
+        If i + 2 <= n Then
+            If Mid$(base64Text, i + 2, 1) <> "=" Then
+                output(dataLength) = _
+                    CByte(((b And 15) * 16) + (c \ 4))
+                dataLength = dataLength + 1
+            End If
+        End If
+
+        If i + 3 <= n Then
+            If Mid$(base64Text, i + 3, 1) <> "=" Then
+                output(dataLength) = _
+                    CByte(((c And 3) * 64) + d)
+                dataLength = dataLength + 1
+            End If
+        End If
+
+    Next i
+
+    If dataLength > 0 Then
+        ReDim Preserve output(0 To dataLength - 1)
+    Else
+        ReDim output(0 To 0)
+    End If
+
+    INPUTBase64Dekodieren = output
+
+End Function
+
+Private Function INPUTBase64Wert( _
+    ByVal ch As String) As Long
+
+    Dim n As Long
+
+    If Len(ch) = 0 Then Exit Function
+
+    n = AscW(ch)
+
+    Select Case n
+        Case 65 To 90
+            INPUTBase64Wert = n - 65
+        Case 97 To 122
+            INPUTBase64Wert = n - 97 + 26
+        Case 48 To 57
+            INPUTBase64Wert = n - 48 + 52
+        Case 43
+            INPUTBase64Wert = 62
+        Case 47
+            INPUTBase64Wert = 63
+        Case Else
+            Err.Raise 1004, , _
+                "Ungültiges Base64-Zeichen in der GitHub-Antwort: " & ch
+    End Select
+
+End Function
+
+Private Function INPUTUTF8BytesZuString( _
+    ByRef data() As Byte, _
+    ByVal dataLength As Long) As String
+
+    Dim i As Long
+    Dim b1 As Long
+    Dim b2 As Long
+    Dim b3 As Long
+    Dim b4 As Long
+    Dim codePoint As Long
+    Dim result As String
+
+    i = 0
+
+    Do While i < dataLength
+
+        b1 = data(i)
+
+        If b1 < 128 Then
+            result = result & ChrW$(b1)
+            i = i + 1
+
+        ElseIf b1 >= 192 And b1 <= 223 Then
+            If i + 1 >= dataLength Then Exit Do
+            b2 = data(i + 1)
+            codePoint = ((b1 And 31) * 64) + (b2 And 63)
+            result = result & ChrW$(codePoint)
+            i = i + 2
+
+        ElseIf b1 >= 224 And b1 <= 239 Then
+            If i + 2 >= dataLength Then Exit Do
+            b2 = data(i + 1)
+            b3 = data(i + 2)
+            codePoint = _
+                ((b1 And 15) * 4096) + _
+                ((b2 And 63) * 64) + _
+                (b3 And 63)
+            result = result & ChrW$(codePoint)
+            i = i + 3
+
+        ElseIf b1 >= 240 And b1 <= 247 Then
+            If i + 3 >= dataLength Then Exit Do
+            b2 = data(i + 1)
+            b3 = data(i + 2)
+            b4 = data(i + 3)
+            codePoint = _
+                ((b1 And 7) * 262144) + _
+                ((b2 And 63) * 4096) + _
+                ((b3 And 63) * 64) + _
+                (b4 And 63)
+            codePoint = codePoint - &H10000
+            result = result & ChrW$(&HD800 Or (codePoint \ 1024))
+            result = result & ChrW$(&HDC00 Or (codePoint And 1023))
+            i = i + 4
+
+        Else
+            Err.Raise 1004, , "Ungültige UTF-8-Daten in INPUT.json."
+        End If
+
+    Loop
+
+    INPUTUTF8BytesZuString = result
+
+End Function
+
+Private Function INPUTJSONInTabelle( _
+    ByVal jsonText As String, _
+    ByVal ws As Worksheet) As Long
+
+    Dim pos As Long
+    Dim objektStart As Long
+    Dim objektEnde As Long
+    Dim zeile As Long
+    Dim objekt As String
+    Dim gemeldet As Long
+
+    jsonText = Trim$(jsonText)
+
+    If Left$(jsonText, 1) = ChrW$(&HFEFF) Then
+        jsonText = Mid$(jsonText, 2)
+    End If
+
+    pos = 1
+    zeile = 2
+
+    Do
+
+        objekt = INPUTNaechstesSpielerObjekt( _
+            jsonText, pos, objektStart, objektEnde)
+
+        If Len(objekt) = 0 Then Exit Do
+
+        ws.Cells(zeile, INPUT_SPIELER_SPALTE).Value = INPUTJSONString(objekt, "name")
+        ws.Cells(zeile, INPUT_RANG_SPALTE).Value = INPUTJSONString(objekt, "rank")
+        ws.Cells(zeile, INPUT_ALIASE_SPALTE).Value = INPUTJSONAliases(objekt, "aliases")
+        ws.Cells(zeile, INPUT_H_SPALTE).Value = INPUTJSONWert(objekt, "heroLevel")
+        ws.Cells(zeile, INPUT_MACHT_SPALTE).Value = INPUTJSONWert(objekt, "mightLevel")
+        ws.Cells(zeile, INPUT_G_SPALTE).Value = INPUTJSONWert(objekt, "guardsLevel")
+        ws.Cells(zeile, INPUT_M_SPALTE).Value = INPUTJSONWert(objekt, "monstersLevel")
+        ws.Cells(zeile, INPUT_S_SPALTE).Value = INPUTJSONWert(objekt, "specialistsLevel")
+        ws.Cells(zeile, INPUT_E_SPALTE).Value = INPUTJSONWert(objekt, "engineersLevel")
+        ws.Cells(zeile, INPUT_JOINED_SPALTE).Value = INPUTJSONString(objekt, "joinedAt")
+
+        zeile = zeile + 1
+
+    Loop
+
+    gemeldet = INPUTJSONGemeldeteAnzahl(jsonText)
+
+    If gemeldet > 0 And (zeile - 2) <> gemeldet Then
+        Err.Raise 1004, , _
+            "INPUT.json enthält " & CStr(zeile - 2) & _
+            " Spielerobjekte, meldet aber " & CStr(gemeldet) & " Spieler."
+    End If
+
+    INPUTJSONInTabelle = zeile - 2
+
+End Function
+
+Private Function INPUTNaechstesSpielerObjekt( _
+    ByVal jsonText As String, _
+    ByRef pos As Long, _
+    ByRef objektStart As Long, _
+    ByRef objektEnde As Long) As String
+
+    Dim i As Long
+    Dim n As Long
+    Dim inString As Boolean
+    Dim escaped As Boolean
+    Dim ch As String
+    Dim prev As String
+    Dim depth As Long
+
+    n = Len(jsonText)
+    objektStart = 0
+    objektEnde = 0
+
+    For i = pos To n
+
+        ch = Mid$(jsonText, i, 1)
+
+        If inString Then
+
+            If escaped Then
+                escaped = False
+            ElseIf ch = "\" Then
+                escaped = True
+            ElseIf ch = """" Then
+                inString = False
+            End If
+
+        Else
+
+            If ch = """" Then
+                inString = True
+            ElseIf ch = "{" Then
+                prev = INPUTVorherigesNichtLeerzeichen(jsonText, i - 1)
+                If prev = "[" Or prev = "," Then
+                    objektStart = i
+                    Exit For
+                End If
+            End If
+
+        End If
+
+    Next i
+
+    If objektStart = 0 Then
+        pos = n + 1
+        Exit Function
+    End If
+
+    depth = 0
+    inString = False
+    escaped = False
+
+    For i = objektStart To n
+
+        ch = Mid$(jsonText, i, 1)
+
+        If inString Then
+
+            If escaped Then
+                escaped = False
+            ElseIf ch = "\" Then
+                escaped = True
+            ElseIf ch = """" Then
+                inString = False
+            End If
+
+        Else
+
+            Select Case ch
+                Case """"
+                    inString = True
+                Case "{"
+                    depth = depth + 1
+                Case "}"
+                    depth = depth - 1
+                    If depth = 0 Then
+                        objektEnde = i
+                        pos = i + 1
+                        INPUTNaechstesSpielerObjekt = _
+                            Mid$(jsonText, objektStart, objektEnde - objektStart + 1)
+                        Exit Function
+                    End If
+            End Select
+
+        End If
+
+    Next i
+
+    pos = n + 1
+
+End Function
+
+Private Function INPUTVorherigesNichtLeerzeichen( _
+    ByVal text As String, _
+    ByVal pos As Long) As String
+
+    Dim ch As String
+
+    Do While pos >= 1
+
+        ch = Mid$(text, pos, 1)
+
+        If ch <> " " And ch <> vbTab And _
+           ch <> vbCr And ch <> vbLf Then
+            INPUTVorherigesNichtLeerzeichen = ch
+            Exit Function
+        End If
+
+        pos = pos - 1
+
+    Loop
+
+End Function
+
+Private Function INPUTJSONString( _
+    ByVal objekt As String, _
+    ByVal feldname As String) As String
+
+    Dim roh As String
+    roh = INPUTJSONRohwert(objekt, feldname)
+
+    If Len(roh) = 0 Then Exit Function
+
+    If Left$(roh, 1) = """" And Right$(roh, 1) = """" Then
+        roh = Mid$(roh, 2, Len(roh) - 2)
+        INPUTJSONString = INPUTJSONEscapesAufloesen(roh)
+    ElseIf LCase$(roh) = "null" Then
+        INPUTJSONString = vbNullString
+    Else
+        INPUTJSONString = roh
+    End If
+
+End Function
+
+Private Function INPUTJSONWert( _
+    ByVal objekt As String, _
+    ByVal feldname As String) As Variant
+
+    Dim roh As String
+    roh = INPUTJSONRohwert(objekt, feldname)
+
+    If Len(roh) = 0 Or LCase$(roh) = "null" Then
+        INPUTJSONWert = vbNullString
+    Else
+        INPUTJSONWert = roh
+    End If
+
+End Function
+
+Private Function INPUTJSONAliases( _
+    ByVal objekt As String, _
+    ByVal feldname As String) As String
+
+    Dim roh As String
+    Dim i As Long
+    Dim ende As Long
+    Dim ch As String
+    Dim wert As String
+    Dim result As String
+
+    roh = INPUTJSONRohwert(objekt, feldname)
+
+    If Len(roh) < 2 Then Exit Function
+    If Left$(roh, 1) <> "[" Then Exit Function
+
+    i = 2
+
+    Do While i < Len(roh)
+
+        ch = Mid$(roh, i, 1)
+
+        If ch = """" Then
+
+            ende = INPUTJSONStringEnde(roh, i)
+
+            If ende <= i Then Exit Do
+
+            wert = Mid$(roh, i + 1, ende - i - 1)
+            wert = INPUTJSONEscapesAufloesen(wert)
+
+            If Len(result) > 0 Then result = result & ", "
+            result = result & wert
+
+            i = ende + 1
+
+        Else
+
+            i = i + 1
+
+        End If
+
+    Loop
+
+    INPUTJSONAliases = result
+
+End Function
+
+Private Function INPUTJSONRohwert( _
+    ByVal objekt As String, _
+    ByVal feldname As String) As String
+
+    Dim marker As String
+    Dim p As Long
+    Dim i As Long
+    Dim startPos As Long
+    Dim ende As Long
+    Dim ch As String
+    Dim inString As Boolean
+    Dim escaped As Boolean
+    Dim depth As Long
+
+    marker = """" & feldname & """:"
+    p = InStr(1, objekt, marker, vbBinaryCompare)
+
+    If p = 0 Then Exit Function
+
+    startPos = p + Len(marker)
+
+    Do While startPos <= Len(objekt)
+
+        ch = Mid$(objekt, startPos, 1)
+
+        If ch <> " " And ch <> vbTab And _
+           ch <> vbCr And ch <> vbLf Then Exit Do
+
+        startPos = startPos + 1
+
+    Loop
+
+    If startPos > Len(objekt) Then Exit Function
+
+    ch = Mid$(objekt, startPos, 1)
+
+    If ch = """" Then
+
+        ende = INPUTJSONStringEnde(objekt, startPos)
+
+        If ende > startPos Then
+            INPUTJSONRohwert = Mid$(objekt, startPos, ende - startPos + 1)
+        End If
+
+        Exit Function
+
+    End If
+
+    If ch = "[" Or ch = "{" Then
+
+        depth = 0
+        inString = False
+        escaped = False
+
+        For i = startPos To Len(objekt)
+
+            ch = Mid$(objekt, i, 1)
+
+            If inString Then
+
+                If escaped Then
+                    escaped = False
+                ElseIf ch = "\" Then
+                    escaped = True
+                ElseIf ch = """" Then
+                    inString = False
+                End If
+
+            Else
+
+                Select Case ch
+                    Case """"
+                        inString = True
+                    Case "[", "{"
+                        depth = depth + 1
+                    Case "]", "}"
+                        depth = depth - 1
+                        If depth = 0 Then
+                            INPUTJSONRohwert = _
+                                Mid$(objekt, startPos, i - startPos + 1)
+                            Exit Function
+                        End If
+                End Select
+
+            End If
+
+        Next i
+
+        Exit Function
+
+    End If
+
+    ende = startPos
+
+    Do While ende <= Len(objekt)
+
+        ch = Mid$(objekt, ende, 1)
+
+        If ch = "," Or ch = "}" Then Exit Do
+
+        ende = ende + 1
+
+    Loop
+
+    INPUTJSONRohwert = Trim$(Mid$(objekt, startPos, ende - startPos))
+
+End Function
+
+Private Function INPUTJSONStringEnde( _
+    ByVal text As String, _
+    ByVal startPos As Long) As Long
+
+    Dim i As Long
+    Dim escaped As Boolean
+    Dim ch As String
+
+    For i = startPos + 1 To Len(text)
+
+        ch = Mid$(text, i, 1)
+
+        If escaped Then
+            escaped = False
+        ElseIf ch = "\" Then
+            escaped = True
+        ElseIf ch = """" Then
+            INPUTJSONStringEnde = i
+            Exit Function
+        End If
+
+    Next i
+
+End Function
+
+Private Function INPUTJSONEscapesAufloesen( _
+    ByVal text As String) As String
+
+    text = Replace(text, "\""", """")
+    text = Replace(text, "\\", "\")
+    text = Replace(text, "\/", "/")
+    text = Replace(text, "\b", Chr$(8))
+    text = Replace(text, "\f", Chr$(12))
+    text = Replace(text, "\n", vbLf)
+    text = Replace(text, "\r", vbCr)
+    text = Replace(text, "\t", vbTab)
+
+    INPUTJSONEscapesAufloesen = text
+
+End Function
+
+Private Function INPUTJSONGemeldeteAnzahl( _
+    ByVal jsonText As String) As Long
+
+    Dim pEnd As Long
+    Dim pComma As Long
+    Dim text As String
+
+    pEnd = InStrRev(jsonText, "]")
+    If pEnd = 0 Then Exit Function
+
+    pComma = InStrRev(jsonText, ",", pEnd - 1)
+    If pComma = 0 Then Exit Function
+
+    text = Trim$(Mid$(jsonText, pComma + 1, pEnd - pComma - 1))
+
+    If IsNumeric(text) Then INPUTJSONGemeldeteAnzahl = CLng(text)
+
+End Function
+
 
 ' ============================================================
 ' COLLECTION-HILFSFUNKTIONEN
@@ -3214,10 +4067,10 @@ End Function
 ' UPDATE-DATEN PRÜFEN
 ' ============================================================
 
-Private Sub UpdateDatenPruefen( _
-    ByVal letzteZeileUpdate As Long)
+Private Sub INPUTDatenPruefen( _
+    ByVal letzteZeileInput As Long)
 
-    If letzteZeileUpdate < 2 Then
+    If letzteZeileInput < 2 Then
 
         Err.Raise 1004, , _
             "Im Blatt 'update' wurden keine Spielerdaten gefunden."
@@ -3295,9 +4148,9 @@ End Sub
 
 Private Function DatenAenderungenErmitteln( _
     ByVal wsDash As Worksheet, _
-    ByVal wsUpdate As Worksheet, _
+    ByVal wsInput As Worksheet, _
     ByVal dashZeile As Long, _
-    ByVal updateZeile As Long, _
+    ByVal inputZeile As Long, _
     ByVal cSpieler As Long, _
     ByVal cRang As Long, _
     ByVal cH As Long, _
@@ -3313,7 +4166,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cSpieler).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_SPIELER_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_SPIELER_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3322,7 +4175,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cRang).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_RANG_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_RANG_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3331,7 +4184,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cH).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_H_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_H_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3340,7 +4193,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cMacht).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_MACHT_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_MACHT_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3349,7 +4202,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cG).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_G_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_G_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3358,7 +4211,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cM).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_M_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_M_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3367,7 +4220,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cS).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_S_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_S_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3376,7 +4229,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cE).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_E_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_E_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3385,7 +4238,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cJoined).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_JOINED_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_JOINED_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3394,7 +4247,7 @@ Private Function DatenAenderungenErmitteln( _
 
     If WerteVerschieden( _
             wsDash.Cells(dashZeile, cAliasse).Value, _
-            wsUpdate.Cells(updateZeile, UPDATE_ALIASE_SPALTE).Value) Then
+            wsInput.Cells(inputZeile, INPUT_ALIASE_SPALTE).Value) Then
 
         DatenAenderungenErmitteln = True
         Exit Function
@@ -3439,9 +4292,9 @@ End Function
 
 Private Sub DatenUebernehmen( _
     ByVal wsDash As Worksheet, _
-    ByVal wsUpdate As Worksheet, _
+    ByVal wsInput As Worksheet, _
     ByVal dashZeile As Long, _
-    ByVal updateZeile As Long, _
+    ByVal inputZeile As Long, _
     ByVal cSpieler As Long, _
     ByVal cRang As Long, _
     ByVal cH As Long, _
@@ -3456,72 +4309,72 @@ Private Sub DatenUebernehmen( _
     wsDash.Cells( _
         dashZeile, _
         cSpieler).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_SPIELER_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_SPIELER_SPALTE).Value
 
     wsDash.Cells( _
         dashZeile, _
         cRang).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_RANG_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_RANG_SPALTE).Value
 
     wsDash.Cells( _
         dashZeile, _
         cH).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_H_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_H_SPALTE).Value
 
     wsDash.Cells( _
         dashZeile, _
         cMacht).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_MACHT_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_MACHT_SPALTE).Value
 
     wsDash.Cells( _
         dashZeile, _
         cG).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_G_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_G_SPALTE).Value
 
     wsDash.Cells( _
         dashZeile, _
         cM).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_M_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_M_SPALTE).Value
 
     wsDash.Cells( _
         dashZeile, _
         cS).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_S_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_S_SPALTE).Value
 
     wsDash.Cells( _
         dashZeile, _
         cE).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_E_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_E_SPALTE).Value
 
     wsDash.Cells( _
         dashZeile, _
         cJoined).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_JOINED_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_JOINED_SPALTE).Value
 
     wsDash.Cells( _
         dashZeile, _
         cAliasse).Value = _
-        wsUpdate.Cells( _
-            updateZeile, _
-            UPDATE_ALIASE_SPALTE).Value
+        wsInput.Cells( _
+            inputZeile, _
+            INPUT_ALIASE_SPALTE).Value
 
 End Sub
 
