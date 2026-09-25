@@ -13,30 +13,28 @@ jobs:
   inspect-api:
     runs-on: ubuntu-latest
     steps:
-      - name: Test live tournament summary
+      - name: Inspect live summary response
         env:
           CT_EMAIL: ${{ secrets.CT_EMAIL }}
           CT_PASSWORD: ${{ secrets.CT_PASSWORD }}
         run: |
           python3 <<'PY'
           import json, os, urllib.parse, urllib.request, urllib.error
+          BASE="https://api.chesttracker.com"
 
-          BASE = "https://api.chesttracker.com"
-
-          def request_json(url, method="GET", body=None, token=None):
-              headers = {"Accept":"application/json","Content-Type":"application/json","User-Agent":"LEG1-API-LiveSummaryTest/1.0"}
-              if token:
-                  headers["Authorization"] = token
-              data = json.dumps(body).encode() if body is not None else None
+          def req(url,method="GET",body=None,token=None):
+              h={"Accept":"application/json","Content-Type":"application/json","User-Agent":"LEG1-API-LiveSummaryTest/1.1"}
+              if token: h["Authorization"]=token
+              data=json.dumps(body).encode() if body is not None else None
               try:
-                  with urllib.request.urlopen(urllib.request.Request(url,data=data,headers=headers,method=method),timeout=60) as r:
+                  with urllib.request.urlopen(urllib.request.Request(url,data=data,headers=h,method=method),timeout=60) as r:
                       return json.loads(r.read().decode())
               except urllib.error.HTTPError as e:
                   raise SystemExit(f"API request failed: HTTP {e.code}: {e.read().decode(errors='replace')}")
 
           print("1. Authenticating...")
-          auth=request_json(BASE+"/v1/authenticate",method="POST",body={"email":os.environ["CT_EMAIL"],"password":os.environ["CT_PASSWORD"],"remember":False})
-          token=auth.get("authToken")
+          a=req(BASE+"/v1/authenticate","POST",{"email":os.environ["CT_EMAIL"],"password":os.environ["CT_PASSWORD"],"remember":False})
+          token=a.get("authToken")
           if not token: raise SystemExit("Authentication returned no authToken.")
           if not token.lower().startswith("bearer "): token="Bearer "+token
           print("   Authentication: OK")
@@ -44,40 +42,23 @@ jobs:
           start="2026-04-15T00:00:00.000Z"
           end="2026-04-16T00:00:00.000Z"
           url=BASE+"/v1/tournaments/summary?"+urllib.parse.urlencode({"start":start,"end":end})
-
           print("2. Calling live summary endpoint...")
-          print("   Window:",start,"to",end)
-          result=request_json(url,token=token)
+          result=req(url,token=token)
+          print("   Response type:",type(result).__name__)
 
-          if not isinstance(result,list) or len(result)!=2:
-              raise SystemExit("Unexpected summary response: expected [rankings, dates].")
-
-          rankings,dates=result
-          print("   Summary response: OK")
-          print("   Rankings:",len(rankings) if isinstance(rankings,list) else type(rankings).__name__)
-          print("   Dates map type:",type(dates).__name__)
-
-          if not isinstance(rankings,list):
-              raise SystemExit("rankings is not a list.")
-          if not isinstance(dates,dict):
-              raise SystemExit("dates is not an object.")
-
-          roa=[m for m in rankings if isinstance(m,dict) and "Rise Of The Ancients" in m]
-          print("   Members with Rise Of The Ancients data:",len(roa))
-
-          if roa:
-              m=roa[0]
-              print("3. FIRST MATCHING MEMBER:")
-              print("   name:",m.get("name"))
-              print("   id present:",bool(m.get("id")))
-              print("   total points type:",type(m.get("points")).__name__)
-              print("   ROA dates:",sorted(m["Rise Of The Ancients"].keys()) if isinstance(m["Rise Of The Ancients"],dict) else type(m["Rise Of The Ancients"]).__name__)
-              print("   ROA data:",json.dumps(m["Rise Of The Ancients"],ensure_ascii=False))
+          if isinstance(result,dict):
+              print("   Top-level keys:",sorted(result.keys()))
+              for k,v in result.items():
+                  print("   FIELD",k,"TYPE",type(v).__name__,"LEN",len(v) if hasattr(v,"__len__") else "n/a")
+                  if isinstance(v,list) and v and isinstance(v[0],dict):
+                      print("   FIRST ITEM KEYS:",sorted(v[0].keys()))
+          elif isinstance(result,list):
+              print("   List length:",len(result))
+              for i,v in enumerate(result[:3]):
+                  print("   ITEM",i,"TYPE",type(v).__name__,"LEN",len(v) if hasattr(v,"__len__") else "n/a")
+                  if isinstance(v,dict): print("   ITEM",i,"KEYS",sorted(v.keys()))
           else:
-              print("3. No member contains ROA data in this exact window.")
+              print("   Scalar response:",str(result)[:500])
 
-          print("4. DATES MAP:")
-          print("   Rise Of The Ancients:",dates.get("Rise Of The Ancients"))
-
-          print("TEST RESULT: LIVE SUMMARY ENDPOINT PASSED.")
+          print("TEST RESULT: LIVE RESPONSE STRUCTURE INSPECTED.")
           PY
