@@ -764,7 +764,6 @@ Private Function INPUTArbeitsblattErstellen( _
     Set ws = ThisWorkbook.Worksheets.Add( _
         After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
 
-    ws.Name = INPUT_TEMP_SHEET
     ws.Visible = xlSheetVeryHidden
 
     ws.Cells(1, INPUT_SPIELER_SPALTE).Value = "spieler"
@@ -852,8 +851,6 @@ Private Function INPUTGitHubJSONLaden() As String
 
     Set ws = wb.Worksheets.Add( _
         After:=wb.Worksheets(wb.Worksheets.Count))
-
-    ws.Name = INPUT_DOWNLOAD_SHEET
 
     Set qt = ws.QueryTables.Add( _
         Connection:="URL;" & INPUT_GITHUB_API_URL, _
