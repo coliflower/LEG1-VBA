@@ -1,0 +1,133 @@
+name: Test ChestTracker Rise Of The Ancients
+
+on:
+  push:
+    paths:
+      - ".github/workflows/test-rise-of-the-ancients.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Rise Of The Ancients API
+        env:
+          CT_EMAIL: ${{ secrets.CT_EMAIL }}
+          CT_PASSWORD: ${{ secrets.CT_PASSWORD }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+          import urllib.error
+
+          BASE = "https://api.chesttracker.com"
+          USER_AGENT = "LEG1-RiseOfTheAncients-Test/1.0"
+
+          def request_json(url, method="GET", body=None, token=None):
+              headers = {
+                  "Accept": "application/json",
+                  "Content-Type": "application/json",
+                  "User-Agent": USER_AGENT,
+              }
+              if token:
+                  headers["Authorization"] = token
+              data = json.dumps(body).encode("utf-8") if body is not None else None
+              req = urllib.request.Request(url, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as response:
+                      return json.loads(response.read().decode("utf-8"))
+              except urllib.error.HTTPError as exc:
+                  detail = exc.read().decode("utf-8", errors="replace")
+                  raise SystemExit(f"API request failed: HTTP {exc.code}: {detail}")
+
+          email = os.environ.get("CT_EMAIL", "")
+          password = os.environ.get("CT_PASSWORD", "")
+          if not email or not password:
+              raise SystemExit("Missing CT_EMAIL or CT_PASSWORD.")
+
+          print("1. Authenticating...")
+          auth = request_json(
+              BASE + "/v1/authenticate",
+              method="POST",
+              body={"email": email, "password": password, "remember": False},
+          )
+          token = auth.get("authToken")
+          if not token:
+              raise SystemExit("Authentication returned no authToken.")
+          if not token.lower().startswith("bearer "):
+              token = "Bearer " + token
+          print("   Authentication: OK")
+
+          print("2. Loading tournaments...")
+          all_tournaments = []
+          page = 0
+          size = 100
+          total = None
+
+          while True:
+              query = urllib.parse.urlencode({"page": page, "size": size})
+              payload = request_json(BASE + "/v1/tournaments?" + query, token=token)
+              if not isinstance(payload, list) or len(payload) != 2:
+                  raise SystemExit("Unexpected /v1/tournaments response format.")
+              items, reported_total = payload
+              if not isinstance(items, list) or not isinstance(reported_total, int):
+                  raise SystemExit("Unexpected /v1/tournaments payload.")
+              total = reported_total
+              all_tournaments.extend(items)
+              if len(all_tournaments) >= total or not items:
+                  break
+              page += 1
+
+          print(f"   Tournaments received: {len(all_tournaments)} / {total}")
+
+          types = sorted({str(x.get("type")) for x in all_tournaments if isinstance(x, dict) and x.get("type")})
+          print("3. Tournament types found:")
+          for t in types:
+              print("   - " + t)
+
+          target = [x for x in all_tournaments
+                    if isinstance(x, dict) and str(x.get("type", "")).strip().lower() == "rise of the ancients"]
+
+          print(f"4. Rise Of The Ancients matches: {len(target)}")
+          if not target:
+              raise SystemExit("No tournament with type 'Rise Of The Ancients' was found.")
+
+          tournament = target[0]
+          tournament_id = tournament.get("id")
+          print(f"   First match date: {tournament.get('date')}")
+          print(f"   First match status: {tournament.get('status')}")
+          print(f"   Tournament id present: {bool(tournament_id)}")
+
+          print("5. Loading concrete tournament...")
+          detail = request_json(BASE + "/v1/tournaments/" + urllib.parse.quote(str(tournament_id), safe=""), token=token)
+          if not isinstance(detail, dict):
+              raise SystemExit("Unexpected concrete tournament response.")
+
+          print("   Detail type: " + str(detail.get("type")))
+          entries = detail.get("entries")
+          if entries is None:
+              entries = detail.get("participants")
+          if not isinstance(entries, list):
+              raise SystemExit("Tournament detail contains no list named entries/participants.")
+
+          print(f"   Participant entries: {len(entries)}")
+
+          if entries:
+              sample = entries[:5]
+              for i, entry in enumerate(sample, 1):
+                  if not isinstance(entry, dict):
+                      print(f"   Entry {i}: unexpected non-object")
+                      continue
+                  print(
+                      f"   Entry {i}: memberId field={('memberId' in entry)}, "
+                      f"points field={('points' in entry)}, "
+                      f"member field={('member' in entry)}"
+                  )
+
+          print("TEST RESULT: Rise Of The Ancients endpoint chain is working.")
+          PY
