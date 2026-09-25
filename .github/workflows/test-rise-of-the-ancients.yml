@@ -1,4 +1,4 @@
-name: Test ChestTracker Rise Of The Ancients
+name: Inspect ChestTracker Rise Of The Ancients Structure
 
 on:
   push:
@@ -10,10 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  test-api:
+  inspect-api:
     runs-on: ubuntu-latest
     steps:
-      - name: Test Rise Of The Ancients API
+      - name: Inspect concrete tournament response
         env:
           CT_EMAIL: ${{ secrets.CT_EMAIL }}
           CT_PASSWORD: ${{ secrets.CT_PASSWORD }}
@@ -26,7 +26,7 @@ jobs:
           import urllib.error
 
           BASE = "https://api.chesttracker.com"
-          USER_AGENT = "LEG1-RiseOfTheAncients-Test/1.0"
+          USER_AGENT = "LEG1-RiseOfTheAncients-StructureTest/1.0"
 
           def request_json(url, method="GET", body=None, token=None):
               headers = {
@@ -44,6 +44,28 @@ jobs:
               except urllib.error.HTTPError as exc:
                   detail = exc.read().decode("utf-8", errors="replace")
                   raise SystemExit(f"API request failed: HTTP {exc.code}: {detail}")
+
+          def describe(value, indent=0):
+              prefix = " " * indent
+              if isinstance(value, dict):
+                  print(prefix + f"OBJECT ({len(value)} keys)")
+                  for key in sorted(value.keys()):
+                      v = value[key]
+                      if isinstance(v, list):
+                          print(prefix + f"  {key}: LIST length={len(v)}")
+                          if v:
+                              describe(v[0], indent + 4)
+                      elif isinstance(v, dict):
+                          print(prefix + f"  {key}: OBJECT")
+                          print(prefix + "    keys: " + ", ".join(sorted(v.keys())))
+                      else:
+                          print(prefix + f"  {key}: {type(v).__name__}")
+              elif isinstance(value, list):
+                  print(prefix + f"LIST length={len(value)}")
+                  if value:
+                      describe(value[0], indent + 2)
+              else:
+                  print(prefix + type(value).__name__)
 
           email = os.environ.get("CT_EMAIL", "")
           password = os.environ.get("CT_PASSWORD", "")
@@ -64,70 +86,50 @@ jobs:
           print("   Authentication: OK")
 
           print("2. Loading tournaments...")
-          all_tournaments = []
-          page = 0
-          size = 100
-          total = None
+          payload = request_json(
+              BASE + "/v1/tournaments?" + urllib.parse.urlencode({"page": 0, "size": 100}),
+              token=token,
+          )
+          if not isinstance(payload, list) or len(payload) != 2:
+              raise SystemExit("Unexpected /v1/tournaments response format.")
 
-          while True:
-              query = urllib.parse.urlencode({"page": page, "size": size})
-              payload = request_json(BASE + "/v1/tournaments?" + query, token=token)
-              if not isinstance(payload, list) or len(payload) != 2:
-                  raise SystemExit("Unexpected /v1/tournaments response format.")
-              items, reported_total = payload
-              if not isinstance(items, list) or not isinstance(reported_total, int):
-                  raise SystemExit("Unexpected /v1/tournaments payload.")
-              total = reported_total
-              all_tournaments.extend(items)
-              if len(all_tournaments) >= total or not items:
-                  break
-              page += 1
-
-          print(f"   Tournaments received: {len(all_tournaments)} / {total}")
-
-          types = sorted({str(x.get("type")) for x in all_tournaments if isinstance(x, dict) and x.get("type")})
-          print("3. Tournament types found:")
-          for t in types:
-              print("   - " + t)
-
-          target = [x for x in all_tournaments
-                    if isinstance(x, dict) and str(x.get("type", "")).strip().lower() == "rise of the ancients"]
-
-          print(f"4. Rise Of The Ancients matches: {len(target)}")
+          items, total = payload
+          target = [
+              x for x in items
+              if isinstance(x, dict)
+              and str(x.get("type", "")).strip().lower() == "rise of the ancients"
+          ]
           if not target:
-              raise SystemExit("No tournament with type 'Rise Of The Ancients' was found.")
+              raise SystemExit("No Rise Of The Ancients tournament found.")
 
           tournament = target[0]
           tournament_id = tournament.get("id")
-          print(f"   First match date: {tournament.get('date')}")
-          print(f"   First match status: {tournament.get('status')}")
-          print(f"   Tournament id present: {bool(tournament_id)}")
+          print(f"   Rise Of The Ancients found: {len(target)} in first page")
+          print(f"   Date: {tournament.get('date')}")
+          print(f"   Status: {tournament.get('status')}")
 
-          print("5. Loading concrete tournament...")
-          detail = request_json(BASE + "/v1/tournaments/" + urllib.parse.quote(str(tournament_id), safe=""), token=token)
+          print("3. Loading concrete tournament...")
+          detail = request_json(
+              BASE + "/v1/tournaments/" + urllib.parse.quote(str(tournament_id), safe=""),
+              token=token,
+          )
           if not isinstance(detail, dict):
               raise SystemExit("Unexpected concrete tournament response.")
 
-          print("   Detail type: " + str(detail.get("type")))
-          entries = detail.get("entries")
-          if entries is None:
-              entries = detail.get("participants")
-          if not isinstance(entries, list):
-              raise SystemExit("Tournament detail contains no list named entries/participants.")
+          print("4. Concrete tournament response structure:")
+          describe(detail)
 
-          print(f"   Participant entries: {len(entries)}")
+          print("5. Candidate player/result fields:")
+          candidates = []
+          for key, value in detail.items():
+              low = str(key).lower()
+              if any(word in low for word in ("member", "player", "participant", "entry", "rank", "score", "point", "result", "reward")):
+                  candidates.append((key, type(value).__name__, len(value) if isinstance(value, (list, dict, str)) else ""))
+          if candidates:
+              for item in candidates:
+                  print("   " + " | ".join(map(str, item)))
+          else:
+              print("   None found at top level.")
 
-          if entries:
-              sample = entries[:5]
-              for i, entry in enumerate(sample, 1):
-                  if not isinstance(entry, dict):
-                      print(f"   Entry {i}: unexpected non-object")
-                      continue
-                  print(
-                      f"   Entry {i}: memberId field={('memberId' in entry)}, "
-                      f"points field={('points' in entry)}, "
-                      f"member field={('member' in entry)}"
-                  )
-
-          print("TEST RESULT: Rise Of The Ancients endpoint chain is working.")
+          print("TEST RESULT: Structure inspection completed.")
           PY
