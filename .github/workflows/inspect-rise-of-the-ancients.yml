@@ -54,9 +54,15 @@ jobs:
                       print("   FIRST ITEM KEYS:",sorted(v[0].keys()))
           elif isinstance(result,list):
               print("   List length:",len(result))
-              for i,v in enumerate(result[:3]):
+              for i,v in enumerate(result):
                   print("   ITEM",i,"TYPE",type(v).__name__,"LEN",len(v) if hasattr(v,"__len__") else "n/a")
-                  if isinstance(v,dict): print("   ITEM",i,"KEYS",sorted(v.keys()))
+                  if isinstance(v,dict):
+                      print("   ITEM",i,"KEYS",sorted(v.keys()))
+                      print("   ITEM",i,"CONTENT",json.dumps(v,ensure_ascii=False)[:12000])
+                  elif isinstance(v,list):
+                      print("   ITEM",i,"CONTENT",json.dumps(v,ensure_ascii=False)[:20000])
+                  else:
+                      print("   ITEM",i,"CONTENT",str(v)[:2000])
           else:
               print("   Scalar response:",str(result)[:500])
 
