@@ -13,7 +13,7 @@ jobs:
   inspect-api:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect concrete tournament response
+      - name: Test live tournament summary
         env:
           CT_EMAIL: ${{ secrets.CT_EMAIL }}
           CT_PASSWORD: ${{ secrets.CT_PASSWORD }}
@@ -24,7 +24,7 @@ jobs:
           BASE = "https://api.chesttracker.com"
 
           def request_json(url, method="GET", body=None, token=None):
-              headers = {"Accept":"application/json","Content-Type":"application/json","User-Agent":"LEG1-API-StructureTest/1.0"}
+              headers = {"Accept":"application/json","Content-Type":"application/json","User-Agent":"LEG1-API-LiveSummaryTest/1.0"}
               if token:
                   headers["Authorization"] = token
               data = json.dumps(body).encode() if body is not None else None
@@ -34,24 +34,6 @@ jobs:
               except urllib.error.HTTPError as e:
                   raise SystemExit(f"API request failed: HTTP {e.code}: {e.read().decode(errors='replace')}")
 
-          def describe(value, indent=0):
-              p=" "*indent
-              if isinstance(value,dict):
-                  print(p+f"OBJECT ({len(value)} keys)")
-                  for k in sorted(value):
-                      v=value[k]
-                      if isinstance(v,list):
-                          print(p+f"  {k}: LIST length={len(v)}")
-                          if v: describe(v[0],indent+4)
-                      elif isinstance(v,dict):
-                          print(p+f"  {k}: OBJECT")
-                          print(p+"    keys: "+", ".join(sorted(v.keys())))
-                      else:
-                          print(p+f"  {k}: {type(v).__name__}")
-              elif isinstance(value,list):
-                  print(p+f"LIST length={len(value)}")
-                  if value: describe(value[0],indent+2)
-
           print("1. Authenticating...")
           auth=request_json(BASE+"/v1/authenticate",method="POST",body={"email":os.environ["CT_EMAIL"],"password":os.environ["CT_PASSWORD"],"remember":False})
           token=auth.get("authToken")
@@ -59,29 +41,43 @@ jobs:
           if not token.lower().startswith("bearer "): token="Bearer "+token
           print("   Authentication: OK")
 
-          print("2. Finding Rise Of The Ancients...")
-          payload=request_json(BASE+"/v1/tournaments?"+urllib.parse.urlencode({"page":0,"size":100}),token=token)
-          items,total=payload
-          target=[x for x in items if isinstance(x,dict) and str(x.get("type","")).strip().lower()=="rise of the ancients"]
-          if not target: raise SystemExit("No Rise Of The Ancients tournament found.")
-          t=target[0]
-          print("   Date:",t.get("date"))
-          print("   Status:",t.get("status"))
+          start="2026-04-15T00:00:00.000Z"
+          end="2026-04-16T00:00:00.000Z"
+          url=BASE+"/v1/tournaments/summary?"+urllib.parse.urlencode({"start":start,"end":end})
 
-          print("3. Loading concrete tournament...")
-          detail=request_json(BASE+"/v1/tournaments/"+urllib.parse.quote(str(t.get("id")),safe=""),token=token)
-          if not isinstance(detail,dict): raise SystemExit("Unexpected concrete tournament response.")
+          print("2. Calling live summary endpoint...")
+          print("   Window:",start,"to",end)
+          result=request_json(url,token=token)
 
-          print("4. RESPONSE STRUCTURE:")
-          describe(detail)
+          if not isinstance(result,list) or len(result)!=2:
+              raise SystemExit("Unexpected summary response: expected [rankings, dates].")
 
-          print("5. TOP-LEVEL PLAYER/RESULT CANDIDATES:")
-          found=False
-          for k,v in detail.items():
-              if any(w in k.lower() for w in ("member","player","participant","entry","rank","score","point","result","reward")):
-                  print(f"   {k}: {type(v).__name__}" + (f" length={len(v)}" if isinstance(v,(list,dict,str)) else ""))
-                  found=True
-          if not found: print("   None")
+          rankings,dates=result
+          print("   Summary response: OK")
+          print("   Rankings:",len(rankings) if isinstance(rankings,list) else type(rankings).__name__)
+          print("   Dates map type:",type(dates).__name__)
 
-          print("TEST RESULT: Structure inspection completed.")
+          if not isinstance(rankings,list):
+              raise SystemExit("rankings is not a list.")
+          if not isinstance(dates,dict):
+              raise SystemExit("dates is not an object.")
+
+          roa=[m for m in rankings if isinstance(m,dict) and "Rise Of The Ancients" in m]
+          print("   Members with Rise Of The Ancients data:",len(roa))
+
+          if roa:
+              m=roa[0]
+              print("3. FIRST MATCHING MEMBER:")
+              print("   name:",m.get("name"))
+              print("   id present:",bool(m.get("id")))
+              print("   total points type:",type(m.get("points")).__name__)
+              print("   ROA dates:",sorted(m["Rise Of The Ancients"].keys()) if isinstance(m["Rise Of The Ancients"],dict) else type(m["Rise Of The Ancients"]).__name__)
+              print("   ROA data:",json.dumps(m["Rise Of The Ancients"],ensure_ascii=False))
+          else:
+              print("3. No member contains ROA data in this exact window.")
+
+          print("4. DATES MAP:")
+          print("   Rise Of The Ancients:",dates.get("Rise Of The Ancients"))
+
+          print("TEST RESULT: LIVE SUMMARY ENDPOINT PASSED.")
           PY
