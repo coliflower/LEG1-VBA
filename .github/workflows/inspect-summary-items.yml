@@ -1,0 +1,46 @@
+name: Inspect Live Summary Items
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect live summary items
+        env:
+          CT_EMAIL: ${{ secrets.CT_EMAIL }}
+          CT_PASSWORD: ${{ secrets.CT_PASSWORD }}
+        run: |
+          python3 <<'PY'
+          import json, os, urllib.parse, urllib.request, urllib.error
+          BASE="https://api.chesttracker.com"
+
+          def req(url, method="GET", body=None, token=None):
+              h={"Accept":"application/json","Content-Type":"application/json","User-Agent":"LEG1-API-LiveSummaryTest/1.2"}
+              if token: h["Authorization"]=token
+              data=json.dumps(body).encode() if body is not None else None
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url,data=data,headers=h,method=method),timeout=60) as r:
+                      return json.loads(r.read().decode())
+              except urllib.error.HTTPError as e:
+                  raise SystemExit(f"API request failed: HTTP {e.code}: {e.read().decode(errors='replace')}")
+
+          a=req(BASE+"/v1/authenticate","POST",{"email":os.environ["CT_EMAIL"],"password":os.environ["CT_PASSWORD"],"remember":False})
+          token=a.get("authToken")
+          if not token: raise SystemExit("Authentication returned no authToken.")
+          if not token.lower().startswith("bearer "): token="Bearer "+token
+
+          start="2026-04-15T00:00:00.000Z"
+          end="2026-04-16T00:00:00.000Z"
+          url=BASE+"/v1/tournaments/summary?"+urllib.parse.urlencode({"start":start,"end":end})
+          result=req(url,token=token)
+
+          print("RESPONSE TYPE:",type(result).__name__)
+          print("FULL SAFE RESPONSE:")
+          print(json.dumps(result, indent=2, ensure_ascii=False)[:30000])
+          print("TEST RESULT: LIVE SUMMARY CONTENT INSPECTED.")
+          PY
