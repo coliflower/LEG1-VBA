@@ -1,0 +1,87 @@
+name: Inspect Rise Of The Ancients API Structure
+
+on:
+  push:
+    paths:
+      - ".github/workflows/inspect-rise-of-the-ancients.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect concrete tournament response
+        env:
+          CT_EMAIL: ${{ secrets.CT_EMAIL }}
+          CT_PASSWORD: ${{ secrets.CT_PASSWORD }}
+        run: |
+          python3 <<'PY'
+          import json, os, urllib.parse, urllib.request, urllib.error
+
+          BASE = "https://api.chesttracker.com"
+
+          def request_json(url, method="GET", body=None, token=None):
+              headers = {"Accept":"application/json","Content-Type":"application/json","User-Agent":"LEG1-API-StructureTest/1.0"}
+              if token:
+                  headers["Authorization"] = token
+              data = json.dumps(body).encode() if body is not None else None
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url,data=data,headers=headers,method=method),timeout=60) as r:
+                      return json.loads(r.read().decode())
+              except urllib.error.HTTPError as e:
+                  raise SystemExit(f"API request failed: HTTP {e.code}: {e.read().decode(errors='replace')}")
+
+          def describe(value, indent=0):
+              p=" "*indent
+              if isinstance(value,dict):
+                  print(p+f"OBJECT ({len(value)} keys)")
+                  for k in sorted(value):
+                      v=value[k]
+                      if isinstance(v,list):
+                          print(p+f"  {k}: LIST length={len(v)}")
+                          if v: describe(v[0],indent+4)
+                      elif isinstance(v,dict):
+                          print(p+f"  {k}: OBJECT")
+                          print(p+"    keys: "+", ".join(sorted(v.keys())))
+                      else:
+                          print(p+f"  {k}: {type(v).__name__}")
+              elif isinstance(value,list):
+                  print(p+f"LIST length={len(value)}")
+                  if value: describe(value[0],indent+2)
+
+          print("1. Authenticating...")
+          auth=request_json(BASE+"/v1/authenticate",method="POST",body={"email":os.environ["CT_EMAIL"],"password":os.environ["CT_PASSWORD"],"remember":False})
+          token=auth.get("authToken")
+          if not token: raise SystemExit("Authentication returned no authToken.")
+          if not token.lower().startswith("bearer "): token="Bearer "+token
+          print("   Authentication: OK")
+
+          print("2. Finding Rise Of The Ancients...")
+          payload=request_json(BASE+"/v1/tournaments?"+urllib.parse.urlencode({"page":0,"size":100}),token=token)
+          items,total=payload
+          target=[x for x in items if isinstance(x,dict) and str(x.get("type","")).strip().lower()=="rise of the ancients"]
+          if not target: raise SystemExit("No Rise Of The Ancients tournament found.")
+          t=target[0]
+          print("   Date:",t.get("date"))
+          print("   Status:",t.get("status"))
+
+          print("3. Loading concrete tournament...")
+          detail=request_json(BASE+"/v1/tournaments/"+urllib.parse.quote(str(t.get("id")),safe=""),token=token)
+          if not isinstance(detail,dict): raise SystemExit("Unexpected concrete tournament response.")
+
+          print("4. RESPONSE STRUCTURE:")
+          describe(detail)
+
+          print("5. TOP-LEVEL PLAYER/RESULT CANDIDATES:")
+          found=False
+          for k,v in detail.items():
+              if any(w in k.lower() for w in ("member","player","participant","entry","rank","score","point","result","reward")):
+                  print(f"   {k}: {type(v).__name__}" + (f" length={len(v)}" if isinstance(v,(list,dict,str)) else ""))
+                  found=True
+          if not found: print("   None")
+
+          print("TEST RESULT: Structure inspection completed.")
+          PY
