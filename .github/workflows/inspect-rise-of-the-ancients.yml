@@ -11,60 +11,74 @@ permissions:
 
 jobs:
   inspect-api:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - name: Inspect live summary response
+      - name: Authenticate and test baseline read access
         env:
           CT_EMAIL: ${{ secrets.CT_EMAIL }}
           CT_PASSWORD: ${{ secrets.CT_PASSWORD }}
         run: |
           python3 <<'PY'
           import json, os, urllib.parse, urllib.request, urllib.error
-          BASE="https://api.chesttracker.com"
+          BASE = "https://api.chesttracker.com"
+          UA = "LEG1-API-BaselineTest/2.0"
 
-          def req(url,method="GET",body=None,token=None):
-              h={"Accept":"application/json","Content-Type":"application/json","User-Agent":"LEG1-API-LiveSummaryTest/1.1"}
-              if token: h["Authorization"]=token
-              data=json.dumps(body).encode() if body is not None else None
+          def req(path, method="GET", body=None, token=None):
+              url = BASE + path
+              headers = {"Accept":"application/json","Content-Type":"application/json","User-Agent":UA}
+              if token:
+                  headers["Authorization"] = token
+              data = json.dumps(body).encode() if body is not None else None
               try:
-                  with urllib.request.urlopen(urllib.request.Request(url,data=data,headers=h,method=method),timeout=60) as r:
-                      return json.loads(r.read().decode())
+                  with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=60) as r:
+                      return r.status, json.loads(r.read().decode("utf-8"))
               except urllib.error.HTTPError as e:
-                  raise SystemExit(f"API request failed: HTTP {e.code}: {e.read().decode(errors='replace')}")
+                  detail = e.read().decode("utf-8", errors="replace")
+                  return e.code, detail
+
+          email = os.environ.get("CT_EMAIL","")
+          password = os.environ.get("CT_PASSWORD","")
+          if not email or not password:
+              raise SystemExit("Missing CT_EMAIL or CT_PASSWORD.")
 
           print("1. Authenticating...")
-          a=req(BASE+"/v1/authenticate","POST",{"email":os.environ["CT_EMAIL"],"password":os.environ["CT_PASSWORD"],"remember":False})
-          token=a.get("authToken")
-          if not token: raise SystemExit("Authentication returned no authToken.")
-          if not token.lower().startswith("bearer "): token="Bearer "+token
+          status, auth = req("/v1/authenticate", "POST",
+                             {"email":email, "password":password, "remember":False})
+          if status != 200 or not isinstance(auth, dict) or not auth.get("authToken"):
+              raise SystemExit(f"Authentication failed: HTTP {status}: {auth}")
+          token = auth["authToken"]
+          if not token.lower().startswith("bearer "):
+              token = "Bearer " + token
           print("   Authentication: OK")
 
+          print("2. Testing authenticated /v1/members read...")
+          status, members = req("/v1/members?page=0&size=5&fields=id,name,rank", token=token)
+          print("   HTTP:", status)
+          if status == 200:
+              print("   MEMBERS RESPONSE:", json.dumps(members, ensure_ascii=False)[:12000])
+          else:
+              print("   MEMBERS ERROR:", members)
+
+          print("3. Testing authenticated /v1/tournaments read...")
+          status, tournaments = req("/v1/tournaments?page=0&size=5", token=token)
+          print("   HTTP:", status)
+          if status == 200:
+              print("   TOURNAMENTS RESPONSE:", json.dumps(tournaments, ensure_ascii=False)[:12000])
+          else:
+              print("   TOURNAMENTS ERROR:", tournaments)
+
+          print("4. Testing authenticated /v1/tournaments/summary...")
           start="2026-04-15T00:00:00.000Z"
           end="2026-04-16T00:00:00.000Z"
-          url=BASE+"/v1/tournaments/summary?"+urllib.parse.urlencode({"start":start,"end":end})
-          print("2. Calling live summary endpoint...")
-          result=req(url,token=token)
-          print("   Response type:",type(result).__name__)
-
-          if isinstance(result,dict):
-              print("   Top-level keys:",sorted(result.keys()))
-              for k,v in result.items():
-                  print("   FIELD",k,"TYPE",type(v).__name__,"LEN",len(v) if hasattr(v,"__len__") else "n/a")
-                  if isinstance(v,list) and v and isinstance(v[0],dict):
-                      print("   FIRST ITEM KEYS:",sorted(v[0].keys()))
-          elif isinstance(result,list):
-              print("   List length:",len(result))
-              for i,v in enumerate(result):
-                  print("   ITEM",i,"TYPE",type(v).__name__,"LEN",len(v) if hasattr(v,"__len__") else "n/a")
-                  if isinstance(v,dict):
-                      print("   ITEM",i,"KEYS",sorted(v.keys()))
-                      print("   ITEM",i,"CONTENT",json.dumps(v,ensure_ascii=False)[:12000])
-                  elif isinstance(v,list):
-                      print("   ITEM",i,"CONTENT",json.dumps(v,ensure_ascii=False)[:20000])
-                  else:
-                      print("   ITEM",i,"CONTENT",str(v)[:2000])
+          query=urllib.parse.urlencode({"start":start,"end":end})
+          status, summary = req("/v1/tournaments/summary?" + query, token=token)
+          print("   HTTP:", status)
+          if status == 200:
+              print("   SUMMARY RESPONSE:", json.dumps(summary, ensure_ascii=False)[:30000])
           else:
-              print("   Scalar response:",str(result)[:500])
+              print("   SUMMARY ERROR:", summary)
 
-          print("TEST RESULT: LIVE RESPONSE STRUCTURE INSPECTED.")
+          print("TEST RESULT: BASELINE AUTHORIZATION DIAGNOSTICS COMPLETED.")
+          if status != 200:
+              print("SUMMARY_STATUS_NON_200")
           PY
