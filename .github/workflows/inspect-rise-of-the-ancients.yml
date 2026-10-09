@@ -105,12 +105,30 @@ jobs:
           print(f"   MATCHING TYPES (keywords: {', '.join(keywords)}): {len(matches)}")
           for t in matches:
               print("      " + json.dumps({
+                  "id": t.get("id"),
                   "type": t.get("type"),
                   "date": t.get("date"),
                   "status": t.get("status"),
                   "points": t.get("points"),
                   "participants": t.get("participants")
               }, ensure_ascii=False))
+
+          print("   POSSIBLE DUPLICATE RISE OF THE ANCIENTS RECORDS:")
+          rise = [t for t in tournaments if str(t.get("type", "")).casefold() == "rise of the ancients"]
+          signatures = {}
+          for t in rise:
+              signature = (str(t.get("points")), str(t.get("participants")), str(t.get("status")))
+              signatures.setdefault(signature, []).append(t)
+          duplicate_groups = [group for group in signatures.values() if len(group) > 1]
+          if not duplicate_groups:
+              print("      No matching points/participants/status signatures found.")
+          else:
+              for group in duplicate_groups:
+                  print("      " + json.dumps([
+                      {"id": t.get("id"), "date": t.get("date"), "points": t.get("points"),
+                       "participants": t.get("participants"), "status": t.get("status")}
+                      for t in group
+                  ], ensure_ascii=False))
 
           print("5. Querying summary for calendar year 2026...")
           query = urllib.parse.urlencode({
