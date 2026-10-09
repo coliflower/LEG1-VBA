@@ -13,40 +13,50 @@ jobs:
   inspect-api:
     runs-on: ubuntu-24.04
     steps:
-      - name: Authenticate and test member-scoped tournament access
+      - name: Inspect tournament types and Rise Of The Ancients summary
         env:
           CT_EMAIL: ${{ secrets.CT_EMAIL }}
           CT_PASSWORD: ${{ secrets.CT_PASSWORD }}
         run: |
           python3 <<'PY'
           import json, os, urllib.parse, urllib.request, urllib.error
+          from collections import Counter
+
           BASE = "https://api.chesttracker.com"
-          UA = "LEG1-API-ImpersonationTest/1.0"
+          UA = "LEG1-RiseOfTheAncients-Diagnostics/1.1"
 
           def req(path, method="GET", body=None, token=None):
-              url = BASE + path
-              headers = {"Accept":"application/json","Content-Type":"application/json","User-Agent":UA}
+              headers = {
+                  "Accept": "application/json",
+                  "Content-Type": "application/json",
+                  "User-Agent": UA
+              }
               if token:
                   headers["Authorization"] = token
-              data = json.dumps(body).encode() if body is not None else None
+              data = json.dumps(body).encode("utf-8") if body is not None else None
               try:
-                  with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=60) as r:
-                      raw = r.read().decode("utf-8")
+                  with urllib.request.urlopen(
+                      urllib.request.Request(BASE + path, data=data, headers=headers, method=method),
+                      timeout=60
+                  ) as response:
+                      raw = response.read().decode("utf-8")
                       try:
-                          return r.status, json.loads(raw)
+                          return response.status, json.loads(raw)
                       except json.JSONDecodeError:
-                          return r.status, raw
-              except urllib.error.HTTPError as e:
-                  return e.code, e.read().decode("utf-8", errors="replace")
+                          return response.status, raw
+              except urllib.error.HTTPError as error:
+                  return error.code, error.read().decode("utf-8", errors="replace")
 
-          email = os.environ.get("CT_EMAIL","")
-          password = os.environ.get("CT_PASSWORD","")
+          email = os.environ.get("CT_EMAIL", "")
+          password = os.environ.get("CT_PASSWORD", "")
           if not email or not password:
               raise SystemExit("Missing CT_EMAIL or CT_PASSWORD.")
 
           print("1. Authenticating...")
-          status, auth = req("/v1/authenticate", "POST",
-                             {"email":email, "password":password, "remember":False})
+          status, auth = req(
+              "/v1/authenticate", "POST",
+              {"email": email, "password": password, "remember": False}
+          )
           if status != 200 or not isinstance(auth, dict) or not auth.get("authToken"):
               raise SystemExit(f"Authentication failed: HTTP {status}: {auth}")
           token = auth["authToken"]
@@ -54,57 +64,98 @@ jobs:
               token = "Bearer " + token
           print("   Authentication: OK")
 
-          print("2. Reading one member to obtain a real memberId...")
-          status, members = req("/v1/members?page=0&size=1&fields=id,name,rank", token=token)
-          print("   HTTP:", status)
-          if status != 200 or not isinstance(members, list) or not members or not isinstance(members[0], list):
+          print("2. Finding a member for scoped access...")
+          status, members = req("/v1/members?page=0&size=1&fields=id", token=token)
+          if status != 200 or not isinstance(members, list) or not members or not isinstance(members[0], list) or not members[0]:
               raise SystemExit(f"Member lookup failed: HTTP {status}: {members}")
-
-          member = members[0][0]
-          member_id = member.get("id") if isinstance(member, dict) else None
-          member_name = member.get("name") if isinstance(member, dict) else None
+          member_id = members[0][0].get("id")
           if not member_id:
-              raise SystemExit(f"No memberId found in response: {members}")
+              raise SystemExit("Member lookup returned no member ID.")
+          print("   Member lookup: OK")
 
-          print("   Member:", member_name)
-          print("   memberId:", member_id)
-
-          print("3. Testing /v1/impersonate with that memberId...")
-          status, scoped = req("/v1/impersonate", "POST", {"memberId":member_id}, token=token)
-          print("   HTTP:", status)
+          print("3. Creating member-scoped token...")
+          status, scoped = req("/v1/impersonate", "POST", {"memberId": member_id}, token=token)
           if status != 200 or not isinstance(scoped, dict) or not scoped.get("authToken"):
-              print("   IMPERSONATE ERROR:", scoped)
-              print("TEST RESULT: IMPERSONATION NOT AVAILABLE FOR THIS MEMBER.")
-              raise SystemExit(0)
-
+              raise SystemExit(f"Impersonation failed: HTTP {status}: {scoped}")
           scoped_token = scoped["authToken"]
           if not scoped_token.lower().startswith("bearer "):
               scoped_token = "Bearer " + scoped_token
           print("   Impersonation: OK")
 
-          print("4. Testing /v1/members with member-scoped token...")
-          status, scoped_members = req("/v1/members?page=0&size=1&fields=id,name,rank", token=scoped_token)
+          print("4. Fetching up to 100 tournaments (API page size is configurable)...")
+          status, payload = req(
+              "/v1/tournaments?page=0&size=100&sort=date,desc&fields=id,type,status,date,points,participants",
+              token=scoped_token
+          )
           print("   HTTP:", status)
-          print("   RESPONSE:", json.dumps(scoped_members, ensure_ascii=False)[:12000])
+          if status != 200 or not isinstance(payload, list) or len(payload) < 2 or not isinstance(payload[0], list):
+              raise SystemExit(f"Tournament request failed or returned unexpected shape: {payload}")
+          tournaments, total = payload[0], payload[1]
+          print(f"   Returned this page: {len(tournaments)}; API total: {total}")
+          counts = Counter(str(t.get("type", "(missing type)")) for t in tournaments if isinstance(t, dict))
+          print("   TOURNAMENT TYPE COUNTS:")
+          for name, count in sorted(counts.items(), key=lambda item: item[0].casefold()):
+              print(f"      {name}: {count}")
 
-          print("5. Testing /v1/tournaments with member-scoped token...")
-          status, tournaments = req("/v1/tournaments?page=0&size=5", token=scoped_token)
-          print("   HTTP:", status)
-          if status == 200:
-              print("   TOURNAMENTS RESPONSE:", json.dumps(tournaments, ensure_ascii=False)[:20000])
-          else:
-              print("   TOURNAMENTS ERROR:", tournaments)
+          keywords = ("rise", "ancient", "rota")
+          matches = [
+              t for t in tournaments
+              if any(word in str(t.get("type", "")).casefold() for word in keywords)
+          ]
+          print(f"   MATCHING TYPES (keywords: {', '.join(keywords)}): {len(matches)}")
+          for t in matches:
+              print("      " + json.dumps({
+                  "type": t.get("type"),
+                  "date": t.get("date"),
+                  "status": t.get("status"),
+                  "points": t.get("points"),
+                  "participants": t.get("participants")
+              }, ensure_ascii=False))
 
-          print("6. Testing /v1/tournaments/summary with member-scoped token...")
-          start="2026-04-15T00:00:00.000Z"
-          end="2026-04-16T00:00:00.000Z"
-          query=urllib.parse.urlencode({"start":start,"end":end})
+          print("5. Querying summary for calendar year 2026...")
+          query = urllib.parse.urlencode({
+              "start": "2026-01-01T00:00:00.000Z",
+              "end": "2027-01-01T00:00:00.000Z"
+          })
           status, summary = req("/v1/tournaments/summary?" + query, token=scoped_token)
           print("   HTTP:", status)
-          if status == 200:
-              print("   SUMMARY RESPONSE:", json.dumps(summary, ensure_ascii=False)[:30000])
-          else:
+          if status != 200:
               print("   SUMMARY ERROR:", summary)
+              raise SystemExit("Summary request failed.")
 
-          print("TEST RESULT: MEMBER-SCOPED TOURNAMENT AUTHORIZATION DIAGNOSTICS COMPLETED.")
+          if isinstance(summary, list):
+              print("   SUMMARY TOP-LEVEL LIST LENGTHS:",
+                    [len(item) if isinstance(item, (list, dict)) else None for item in summary])
+          else:
+              print("   SUMMARY TOP-LEVEL TYPE:", type(summary).__name__)
+
+          found = []
+          def scan(value, path="$"):
+              if isinstance(value, dict):
+                  for key, child in value.items():
+                      child_path = f"{path}.{key}"
+                      normalized = str(key).casefold().replace(" ", "").replace("_", "").replace("-", "")
+                      if "riseoftheancients" in normalized or "riseoftheancientsevent" in normalized:
+                          found.append((child_path, child))
+                      scan(child, child_path)
+              elif isinstance(value, list):
+                  for index, child in enumerate(value):
+                      scan(child, f"{path}[{index}]")
+
+          scan(summary)
+          print("   RISE OF THE ANCIENTS SUMMARY FIELDS:", len(found))
+          for path, value in found:
+              compact = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+              print(f"      {path} = {compact[:3000]}")
+
+          print("   SUMMARY DATE MAPS (types containing 'rise' or 'ancient'):")
+          if isinstance(summary, list):
+              for index, item in enumerate(summary):
+                  if isinstance(item, dict):
+                      for key, value in item.items():
+                          normalized = str(key).casefold()
+                          if ("rise" in normalized or "ancient" in normalized) and isinstance(value, list):
+                              print(f"      summary[{index}].{key}: {json.dumps(value, ensure_ascii=False)[:5000]}")
+
+          print("TEST RESULT: TOURNAMENT TYPE AND RISE OF THE ANCIENTS DIAGNOSTICS COMPLETED.")
           PY
