@@ -2,7 +2,7 @@
   [
     {
       "id": "afc1c5ca-a505-4a23-bd95-bf70f330a8f0",
-      "name": "003²",
+      "name": "300 cp",
       "status": {
         "value": "administrative",
         "expires": null
@@ -12,7 +12,8 @@
       "rank": "officer",
       "aliases": [
         "003",
-        "0032"
+        "0032",
+        "003²"
       ],
       "userId": "1716bea9-1168-4ec4-a962-e5380a5f44d6",
       "clanId": "79facee8-2238-46d2-aef8-da0c9c7cfbc3",
@@ -22,7 +23,7 @@
       "monstersLevel": 1,
       "specialistsLevel": 1,
       "engineersLevel": 1,
-      "mightLevel": "11616987",
+      "mightLevel": "11628987",
       "heroLevel": 113,
       "cityLevel": 34,
       "vipLevel": 5,
@@ -34,7 +35,7 @@
       "lastDistributionAt": "2026-09-26T20:43:08.605Z",
       "createdAt": "2026-07-23T17:00:00.000Z",
       "createdById": "75c5d576-217c-4e9c-b31f-c61f32a7d365",
-      "updatedAt": "2026-11-09T03:16:12.041Z",
+      "updatedAt": "2026-11-09T19:27:58.152Z",
       "updatedById": "75c5d576-217c-4e9c-b31f-c61f32a7d365",
       "deletedAt": null,
       "deletedById": null
